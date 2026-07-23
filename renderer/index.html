@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self';"
+    />
+    <title>ComfyUI RunPod Launcher</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ================= Onboarding / API key screen ================= -->
+    <section id="screen-setup" class="screen setup hidden">
+      <div class="setup-card">
+        <div class="logo">🎬</div>
+        <h1>ComfyUI RunPod Launcher</h1>
+        <p class="muted">
+          Deploy your ComfyUI GPU pod in one click. First, paste your RunPod API
+          key — it is stored encrypted on this computer only.
+        </p>
+        <label for="apiKeyInput">RunPod API Key</label>
+        <input
+          id="apiKeyInput"
+          type="password"
+          placeholder="rpa_xxxxxxxxxxxxxxxxxxxxxxxx"
+          autocomplete="off"
+        />
+        <button id="saveKeyBtn" class="btn primary full">Save &amp; Continue</button>
+        <p id="setupError" class="error hidden"></p>
+        <a href="#" id="getKeyLink" class="link small"
+          >Where do I find my API key? →</a
+        >
+      </div>
+    </section>
+
+    <!-- ================= Main app ================= -->
+    <section id="screen-main" class="screen main hidden">
+      <aside class="sidebar">
+        <div class="brand"><span class="logo-sm">🎬</span> RunPod Launcher</div>
+        <nav>
+          <button class="nav-item active" data-tab="deploy">🚀 Deploy</button>
+          <button class="nav-item" data-tab="pods">
+            🖥️ My Pods <span id="podCount" class="badge hidden">0</span>
+          </button>
+          <button class="nav-item" data-tab="logs">📜 Logs</button>
+          <button class="nav-item" data-tab="settings">⚙️ Settings</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div id="killIndicator" class="kill-indicator hidden"></div>
+          <a href="#" id="openConsoleLink" class="link small">RunPod Console ↗</a>
+        </div>
+      </aside>
+
+      <main class="content">
+        <!-- ---------- Deploy tab ---------- -->
+        <div id="tab-deploy" class="tab active">
+          <header class="tab-head">
+            <h2>Deploy a new pod</h2>
+            <p class="muted">
+              Pick a GPU, choose which models to pre-download, and launch.
+            </p>
+          </header>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Pod name</label>
+              <input id="podName" type="text" value="comfyui-pod" />
+            </div>
+
+            <div class="field">
+              <label>Cloud type</label>
+              <div class="segmented" id="cloudType">
+                <button data-value="SECURE" class="active">Secure</button>
+                <button data-value="COMMUNITY">Community</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-head">
+              <label>GPU</label>
+              <button id="refreshGpuBtn" class="link small">↻ Refresh prices</button>
+            </div>
+            <div id="gpuList" class="gpu-list">
+              <div class="loading">Loading GPUs…</div>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Container disk (GB)</label>
+              <input id="containerDisk" type="number" min="10" value="50" />
+              <span class="hint">
+                Keep this small (30–50). It's temporary machine disk — models do
+                <b>not</b> go here. Large values make pods fail to place.
+              </span>
+              <span class="hint" id="containerHint"></span>
+            </div>
+            <div class="field">
+              <label>Volume disk (GB) — /workspace</label>
+              <input id="volumeDisk" type="number" min="20" value="120" />
+              <span class="hint">
+                Persistent storage where your models download. Size this to your
+                models.
+              </span>
+              <span class="hint" id="volumeHint"></span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Models to pre-download</label>
+            <p class="hint">
+              Only checked models download at startup. Sizes shown are added to
+              your volume. Uncheck everything for a bare ComfyUI.
+            </p>
+            <div id="modelList" class="model-list"></div>
+          </div>
+
+          <div class="field" id="hfTokenField">
+            <label>HuggingFace token <span class="muted">(optional)</span></label>
+            <input
+              id="hfToken"
+              type="password"
+              placeholder="hf_xxx — only needed for your private LoRAs"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="deploy-bar">
+            <div class="cost-summary">
+              <div>
+                <span class="muted">GPU rate</span>
+                <strong id="summaryRate">—</strong>
+              </div>
+              <div>
+                <span class="muted">Est. disk</span>
+                <strong id="summaryDisk">—</strong>
+              </div>
+            </div>
+            <button id="deployBtn" class="btn primary big" disabled>
+              🚀 Deploy Pod
+            </button>
+          </div>
+          <p id="deployMsg" class="msg hidden"></p>
+        </div>
+
+        <!-- ---------- Pods tab ---------- -->
+        <div id="tab-pods" class="tab">
+          <header class="tab-head row">
+            <div>
+              <h2>My Pods</h2>
+              <p class="muted">Live status of your RunPod instances.</p>
+            </div>
+            <button id="refreshPodsBtn" class="btn ghost">↻ Refresh</button>
+          </header>
+          <div id="podsList" class="pods-list">
+            <div class="loading">Loading pods…</div>
+          </div>
+        </div>
+
+        <!-- ---------- Settings tab ---------- -->
+        <div id="tab-settings" class="tab">
+          <header class="tab-head">
+            <h2>Settings</h2>
+          </header>
+          <div class="field">
+            <label>Docker image</label>
+            <input id="imageName" type="text" />
+            <span class="hint">The image this launcher deploys.</span>
+          </div>
+          <div class="field">
+            <label>RunPod API key</label>
+            <div class="row gap">
+              <input
+                id="settingsKeyStatus"
+                type="text"
+                value="Key saved (encrypted)"
+                disabled
+              />
+              <button id="changeKeyBtn" class="btn ghost">Change key</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Kill switch — when I close the app</label>
+            <select id="onCloseSelect">
+              <option value="nothing">Do nothing (leave pods running)</option>
+              <option value="stop">Stop running pods (keep models, pause billing)</option>
+              <option value="terminate">
+                Terminate running pods (delete pod + models)
+              </option>
+            </select>
+            <span class="hint" id="onCloseHint"></span>
+          </div>
+
+          <button id="saveSettingsBtn" class="btn primary">Save settings</button>
+          <p id="settingsMsg" class="msg hidden"></p>
+        </div>
+
+        <!-- ---------- Logs tab ---------- -->
+        <div id="tab-logs" class="tab">
+          <header class="tab-head row">
+            <div>
+              <h2>Logs</h2>
+              <p class="muted">
+                Every RunPod request and error. API keys are redacted.
+              </p>
+            </div>
+            <div class="row gap">
+              <label class="check-inline">
+                <input type="checkbox" id="autoscrollLogs" checked /> Auto-scroll
+              </label>
+              <button id="copyLogsBtn" class="btn ghost">Copy</button>
+              <button id="clearLogsBtn" class="btn ghost">Clear</button>
+            </div>
+          </header>
+          <div id="logView" class="log-view"></div>
+        </div>
+      </main>
+    </section>
+
+    <!-- ================= Confirm modal ================= -->
+    <div id="modal" class="modal-overlay hidden">
+      <div class="modal">
+        <h3 id="modalTitle">Are you sure?</h3>
+        <p id="modalBody" class="muted"></p>
+        <div class="modal-actions">
+          <button id="modalCancel" class="btn ghost">Cancel</button>
+          <button id="modalConfirm" class="btn danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Closing overlay (kill switch) -->
+    <div id="closingOverlay" class="closing-overlay hidden">
+      <div class="closing-box">
+        <div class="spinner"></div>
+        <h3 id="closingTitle">Closing…</h3>
+        <p class="muted" id="closingBody"></p>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="models.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
