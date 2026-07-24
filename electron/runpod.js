@@ -316,6 +316,41 @@ async function probeComfy(podId) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Fetch the model catalog that ships inside the Docker image.
+//
+// The list of downloadable models is defined by the IMAGE, not the app. It can
+// come from an explicit URL (raw JSON) or from any running pod, which publishes
+// /models.json on its log server. Returns the parsed { models: [...] }.
+// -----------------------------------------------------------------------------
+async function fetchModelManifest({ url, podId }) {
+  const target = url || (podId ? `https://${podId}-${LOG_PORT}.proxy.runpod.net/models.json` : null);
+  if (!target) throw new Error('No manifest source available');
+
+  const res = await fetchWithTimeout(target, 9000);
+  if (!res.ok) throw new Error(`Manifest fetch failed (${res.status})`);
+
+  const data = await res.json();
+  const models = Array.isArray(data) ? data : data.models;
+  if (!Array.isArray(models) || !models.length) {
+    throw new Error('Manifest contained no models');
+  }
+  // Keep only well-formed entries so a bad manifest can't break the UI.
+  const clean = models
+    .filter((m) => m && typeof m.env === 'string' && typeof m.name === 'string')
+    .map((m) => ({
+      env: m.env,
+      name: m.name,
+      desc: typeof m.desc === 'string' ? m.desc : '',
+      gb: Number(m.gb) > 0 ? Number(m.gb) : 0,
+      needsHfToken: !!m.needsHfToken,
+    }));
+  if (!clean.length) throw new Error('Manifest entries were invalid');
+
+  log.ok(`Model manifest loaded (${clean.length} models) from ${url ? 'URL' : 'pod'}`);
+  return { models: clean, source: url ? 'url' : 'pod', image: data.image || null };
+}
+
 // Tail the in-image log server. Returns combined text of the available logs.
 // Throws a clear error when the log server isn't reachable (old image / still
 // booting).
@@ -358,6 +393,7 @@ module.exports = {
   deletePod,
   probeComfy,
   fetchPodLogs,
+  fetchModelManifest,
   COMFYUI_PORT,
   JUPYTER_PORT,
   LOG_PORT,

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   saveHfToken: (t) => invoke('settings:saveHfToken', t),
   clearHfToken: () => invoke('settings:clearHfToken'),
   balance: () => invoke('runpod:balance'),
+  modelManifest: () => invoke('runpod:modelManifest'),
   onClosing: (cb) => {
     const handler = (_evt, action) => cb(action);
     ipcRenderer.on('app:closing', handler);

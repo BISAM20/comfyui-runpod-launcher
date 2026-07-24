@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.1.0-6d5efc)
+![Version](https://img.shields.io/badge/version-1.2.0-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -47,9 +47,17 @@ click **More info → Run anyway**.
 - **Live GPU pricing & availability** — only shows GPUs that are actually
   available, with High / Medium / Low badges and per-hour prices pulled straight
   from RunPod. Favourite GPUs pin to the top.
+- **Cost meter** — live account balance, hourly burn rate, and estimated runtime
+  remaining, with clear warnings before you run out of credit.
 - **One-click deploy** — name the pod, pick Secure or Community, choose which
   models to pre-download, and launch. Container-disk guardrails prevent the
   common "machine does not have the resources" placement failure.
+- **Automatic volume sizing** — the volume disk is sized from the models you
+  select, plus 50 GB of headroom. Override it any time.
+- **Model list comes from the image** — the downloadable models are published by
+  the Docker image itself (`models.json`), so updating the image updates the app's
+  list. No app rebuild needed.
+- **HuggingFace token** — saved encrypted for gated or private models.
 - **Pod management** — live status, direct **Open ComfyUI** and **JupyterLab**
   links, and **Stop** / **Start** / **Terminate** controls.
 - **Progress / Logs** — a per-pod panel with a boot timeline, ComfyUI-readiness
@@ -94,6 +102,30 @@ Models are downloaded on demand via `DOWNLOAD_*` environment variables the app
 sets for you, and are stored on the pod's `/workspace` volume so they survive
 Stop/Start. You can point the app at a different image in **Settings → Docker
 image**.
+
+### Model catalog (`models.json`)
+
+The list of downloadable models is defined by the **image**, not the app. The
+image ships a `models.json` and publishes it on the log server, so the app reads
+the catalog from any running pod — or from a URL set in
+**Settings → Model manifest URL**. If neither is reachable, the app falls back to
+a built-in list.
+
+```json
+{
+  "models": [
+    {
+      "env": "DOWNLOAD_WAN22_T2V",
+      "name": "Wan 2.2 — Text-to-Video",
+      "desc": "High + low noise fp8 (14B)",
+      "gb": 28.6
+    }
+  ]
+}
+```
+
+Add a model to the image (a `DOWNLOAD_*` flag in `start.sh` plus an entry here)
+and it appears in the app automatically.
 
 ---
 

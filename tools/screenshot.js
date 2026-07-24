@@ -10,10 +10,12 @@ fs.mkdirSync(OUT, { recursive: true });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function shoot(win, name) {
-  await wait(600);
+  await wait(900);
   const img = await win.webContents.capturePage();
-  fs.writeFileSync(path.join(OUT, name + '.png'), img.toPNG());
-  console.log('saved', name + '.png');
+  const buf = img.toPNG();
+  if (!buf || !buf.length) throw new Error('empty capture for ' + name);
+  fs.writeFileSync(path.join(OUT, name + '.png'), buf);
+  console.log('saved', name + '.png', buf.length, 'bytes');
 }
 
 app.whenReady().then(async () => {
@@ -35,8 +37,9 @@ app.whenReady().then(async () => {
     (function(){
       var card = document.querySelector('.gpu-card');
       if (card) card.click();
-      var m = document.querySelector('#modelList input');
-      if (m) m.click();
+      var ms = document.querySelectorAll('#modelList input');
+      if (ms[0]) ms[0].click();   // Wan 2.2 T2V  (28.6 GB)
+      if (ms[2]) ms[2].click();   // Wan 2.1 VACE  (9.5 GB)
       var c = document.querySelector('.content');
       if (c) c.scrollTop = 0;   // show the header in the hero shot
     })();

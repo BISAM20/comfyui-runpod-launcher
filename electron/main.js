@@ -169,6 +169,39 @@ handle('settings:clearHfToken', async () => {
 // --- Account balance / spend rate ---
 handle('runpod:balance', async () => runpod.getBalance(requireKey()));
 
+// --- Model catalog, defined by the Docker image rather than the app ---
+// Tries, in order: the configured manifest URL, then any running pod (which
+// serves /models.json on its log server). The renderer falls back to its
+// bundled list if both fail, so the UI always works.
+handle('runpod:modelManifest', async () => {
+  const settings = store.loadSettings();
+  const url = (settings.manifestUrl || '').trim();
+
+  if (url) {
+    try {
+      return await runpod.fetchModelManifest({ url });
+    } catch (e) {
+      log.error('Manifest URL failed: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // No URL (or it failed) — try a running pod.
+  const key = store.getApiKey();
+  if (key) {
+    try {
+      const pods = await runpod.listPods(key);
+      const running = pods.find(
+        (p) => (p.desiredStatus || '').toUpperCase() === 'RUNNING'
+      );
+      if (running) return await runpod.fetchModelManifest({ podId: running.id });
+    } catch (e) {
+      log.error('Manifest from pod failed: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  throw new Error('No manifest available — using the built-in model list.');
+});
+
 handle('settings:setOnClose', async (action) => {
   const valid = ['nothing', 'stop', 'terminate'];
   const s = store.loadSettings();

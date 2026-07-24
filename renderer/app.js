@@ -5,6 +5,10 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+// Spare space added on top of the selected models when auto-sizing the volume
+// (room for generated outputs, ComfyUI cache, and model variance).
+const VOLUME_HEADROOM_GB = 50;
+
 const state = {
   gpus: [],
   selectedGpu: null,
@@ -15,6 +19,7 @@ const state = {
   progress: null, // { id, timer } for the open progress panel
   balanceTimer: null,
   hasHfToken: false,
+  volumeManual: false, // true once the user edits the volume size themselves
 };
 
 // -----------------------------------------------------------------------------
@@ -55,6 +60,8 @@ function confirmModal(title, body, confirmLabel, onConfirm) {
 // -----------------------------------------------------------------------------
 async function boot() {
   wireEvents();
+  // Show the bundled list immediately, then replace it with the image manifest.
+  window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
   renderModelList();
   window.api.onLog(appendLiveLog); // stream logs into the Logs panel
 
@@ -84,11 +91,15 @@ async function afterLogin() {
   if (defaults.ok) {
     $('#imageName').value = defaults.data.image || '';
     if (defaults.data.containerDisk) $('#containerDisk').value = defaults.data.containerDisk;
-    if (defaults.data.volumeDisk) $('#volumeDisk').value = defaults.data.volumeDisk;
+    // Volume size is auto-calculated from the selected models, so we do not
+    // restore a saved value here — updateSummary() fills it in.
+    state.volumeManual = false;
     $('#onCloseSelect').value = defaults.data.onClose || 'nothing';
+    $('#manifestUrl').value = defaults.data.manifestUrl || '';
     updateKillSwitchUI();
   }
   loadGpus();
+  loadModelCatalog();
   loadBalance();
   refreshHfStatus();
   updateSummary();
@@ -274,6 +285,32 @@ function renderGpus() {
 // -----------------------------------------------------------------------------
 // Model list
 // -----------------------------------------------------------------------------
+// Load the model catalog published by the Docker image, falling back to the
+// bundled list when no manifest is reachable.
+async function loadModelCatalog() {
+  // Preserve the user's ticks across a re-render (boot replaces the fallback
+  // list, and "Reload list" refetches it).
+  const checked = new Set(selectedModels().map((m) => m.env));
+  const res = await window.api.modelManifest();
+  const note = $('#modelSource');
+  if (res.ok && res.data && res.data.models.length) {
+    window.MODEL_CATALOG = res.data.models;
+    note.textContent = `✓ ${res.data.models.length} models from the image manifest`;
+    note.style.color = 'var(--green)';
+  } else {
+    window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
+    note.textContent =
+      'Using the built-in list — the image manifest was not reachable.';
+    note.style.color = 'var(--muted)';
+  }
+  renderModelList();
+  // Restore ticks for models that still exist in the new list.
+  for (const input of $$('#modelList input')) {
+    if (checked.has(input.dataset.env)) input.checked = true;
+  }
+  updateSummary();
+}
+
 function renderModelList() {
   const container = $('#modelList');
   container.innerHTML = '';
@@ -313,17 +350,26 @@ function updateSummary() {
 
   const models = selectedModels();
   const modelGb = models.reduce((s, m) => s + m.gb, 0);
-  const needed = Math.ceil(modelGb + 8); // + shared encoders/vae/clip headroom
-  $('#summaryDisk').textContent = modelGb ? `~${needed} GB` : 'bare';
+  // Models + shared encoders/VAE/CLIP + 50 GB working headroom for outputs.
+  const needed = Math.ceil(modelGb + (modelGb ? 8 : 0)) + VOLUME_HEADROOM_GB;
+  $('#summaryDisk').textContent = modelGb ? `~${Math.ceil(modelGb + 8)} GB` : 'bare';
 
-  // Warn if volume disk looks too small for the selected models.
-  const vol = parseInt($('#volumeDisk').value, 10) || 0;
+  // Auto-size the volume unless the user has typed their own value.
+  const volInput = $('#volumeDisk');
   const hint = $('#volumeHint');
-  if (modelGb && vol < needed) {
-    hint.textContent = `⚠ Selected models need ~${needed} GB — increase volume disk.`;
-    hint.style.color = 'var(--amber)';
+  if (!state.volumeManual) {
+    volInput.value = needed;
+    hint.textContent = `Auto-sized: models + ${VOLUME_HEADROOM_GB} GB headroom. Edit to override.`;
+    hint.style.color = 'var(--muted)';
   } else {
-    hint.textContent = '';
+    const vol = parseInt(volInput.value, 10) || 0;
+    if (vol < needed) {
+      hint.textContent = `⚠ Selected models need ~${needed} GB — increase volume disk.`;
+      hint.style.color = 'var(--amber)';
+    } else {
+      hint.textContent = 'Manual size. Clear the field to auto-size again.';
+      hint.style.color = 'var(--muted)';
+    }
   }
 
   // Warn if container disk is set high — the #1 cause of "machine does not
@@ -663,9 +709,14 @@ function wireEvents() {
   );
 
   $('#refreshGpuBtn').addEventListener('click', loadGpus);
+  $('#refreshModelsBtn').addEventListener('click', loadModelCatalog);
   $('#refreshPodsBtn').addEventListener('click', loadPods);
   $('#deployBtn').addEventListener('click', deploy);
-  $('#volumeDisk').addEventListener('input', updateSummary);
+  // Typing a volume size switches to manual; clearing it returns to auto.
+  $('#volumeDisk').addEventListener('input', (e) => {
+    state.volumeManual = e.target.value.trim() !== '';
+    updateSummary();
+  });
   $('#containerDisk').addEventListener('input', updateSummary);
 
   // Settings
@@ -674,7 +725,9 @@ function wireEvents() {
       image: $('#imageName').value.trim(),
       containerDisk: parseInt($('#containerDisk').value, 10) || 30,
       volumeDisk: parseInt($('#volumeDisk').value, 10) || 100,
+      manifestUrl: $('#manifestUrl').value.trim(),
     });
+    loadModelCatalog(); // pick up a changed manifest URL right away
     // Save the HF token only if a new one was typed (blank keeps the existing).
     const hf = $('#settingsHfToken').value.trim();
     if (hf) {

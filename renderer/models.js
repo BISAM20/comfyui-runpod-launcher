@@ -1,12 +1,16 @@
 // =============================================================================
-// Catalog of downloadable models. Each entry maps a friendly UI row to the
-// environment variable flag the Docker image's start.sh understands.
+// FALLBACK model catalog.
 //
-// `gb` is the approximate size added to the /workspace volume (used to warn if
-// the chosen volume disk is too small). Values match the image README.
+// The real list is published by the Docker image itself (models.json, served by
+// a running pod on port 8189, or fetched from the manifest URL in Settings).
+// This copy is only used when no manifest can be reached, so the app still
+// works offline / before the first pod exists.
+//
+// Each entry maps a UI row to the DOWNLOAD_* env flag the image's start.sh
+// understands. `gb` is the approximate size added to the /workspace volume.
 // =============================================================================
 
-window.MODEL_CATALOG = [
+window.MODEL_CATALOG_FALLBACK = [
   {
     env: 'DOWNLOAD_WAN22_T2V',
     name: 'Wan 2.2 — Text-to-Video',

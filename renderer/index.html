@@ -123,11 +123,15 @@
           </div>
 
           <div class="field">
-            <label>Models to pre-download</label>
+            <div class="field-head">
+              <label>Models to pre-download</label>
+              <button id="refreshModelsBtn" class="link small">↻ Reload list</button>
+            </div>
             <p class="hint">
-              Only checked models download at startup. Sizes shown are added to
-              your volume. Uncheck everything for a bare ComfyUI.
+              Only checked models download at startup. The volume size below is
+              sized automatically. Uncheck everything for a bare ComfyUI.
             </p>
+            <p class="hint" id="modelSource"></p>
             <div id="modelList" class="model-list"></div>
           </div>
 
@@ -196,6 +200,20 @@
               <button id="changeKeyBtn" class="btn ghost">Change key</button>
             </div>
           </div>
+          <div class="field">
+            <label>Model manifest URL <span class="muted">(optional)</span></label>
+            <input
+              id="manifestUrl"
+              type="text"
+              placeholder="https://.../models.json — leave blank to read from a running pod"
+            />
+            <span class="hint">
+              The model list comes from the Docker image, not the app. Leave
+              blank and it is read from any running pod; set a URL to load it
+              without a pod.
+            </span>
+          </div>
+
           <div class="field">
             <label>HuggingFace token <span class="muted">(optional)</span></label>
             <div class="row gap">
