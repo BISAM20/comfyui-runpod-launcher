@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld('api', {
   getDeployDefaults: () => invoke('settings:getDeployDefaults'),
   saveDeployDefaults: (obj) => invoke('settings:saveDeployDefaults', obj),
   setOnClose: (action) => invoke('settings:setOnClose', action),
+  hasHfToken: () => invoke('settings:hasHfToken'),
+  saveHfToken: (t) => invoke('settings:saveHfToken', t),
+  clearHfToken: () => invoke('settings:clearHfToken'),
+  balance: () => invoke('runpod:balance'),
   onClosing: (cb) => {
     const handler = (_evt, action) => cb(action);
     ipcRenderer.on('app:closing', handler);

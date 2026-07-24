@@ -48,6 +48,19 @@
           <button class="nav-item" data-tab="settings">⚙️ Settings</button>
         </nav>
         <div class="sidebar-footer">
+          <!-- Cost meter -->
+          <div id="costMeter" class="cost-meter hidden">
+            <div class="cm-row">
+              <span class="cm-label">Balance</span>
+              <span class="cm-balance" id="cmBalance">—</span>
+            </div>
+            <div class="cm-bar"><div class="cm-fill" id="cmFill"></div></div>
+            <div class="cm-row cm-sub">
+              <span id="cmSpend">$0.00/hr</span>
+              <span id="cmRuntime"></span>
+            </div>
+            <div class="cm-warn hidden" id="cmWarn"></div>
+          </div>
           <div id="killIndicator" class="kill-indicator hidden"></div>
           <a href="#" id="openConsoleLink" class="link small">RunPod Console ↗</a>
         </div>
@@ -119,13 +132,14 @@
           </div>
 
           <div class="field" id="hfTokenField">
-            <label>HuggingFace token <span class="muted">(optional)</span></label>
+            <label>HuggingFace token</label>
             <input
               id="hfToken"
               type="password"
-              placeholder="hf_xxx — only needed for your private LoRAs"
+              placeholder="hf_xxx — for gated / private models"
               autocomplete="off"
             />
+            <span class="hint" id="hfDeployHint"></span>
           </div>
 
           <div class="deploy-bar">
@@ -182,6 +196,25 @@
               <button id="changeKeyBtn" class="btn ghost">Change key</button>
             </div>
           </div>
+          <div class="field">
+            <label>HuggingFace token <span class="muted">(optional)</span></label>
+            <div class="row gap">
+              <input
+                id="settingsHfToken"
+                type="password"
+                placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx"
+                autocomplete="off"
+              />
+              <button id="clearHfBtn" class="btn ghost">Clear</button>
+            </div>
+            <span class="hint" id="hfTokenStatus"></span>
+            <span class="hint">
+              Needed for gated or private HuggingFace models (e.g. your own
+              LoRAs). Stored encrypted on this PC and sent only to the pod you
+              deploy.
+            </span>
+          </div>
+
           <div class="field">
             <label>Kill switch — when I close the app</label>
             <select id="onCloseSelect">

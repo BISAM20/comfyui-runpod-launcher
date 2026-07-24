@@ -92,6 +92,19 @@ async function graphqlRequest(apiKey, query, variables) {
 }
 
 // -----------------------------------------------------------------------------
+// Account balance + current hourly spend (GraphQL `myself`).
+// -----------------------------------------------------------------------------
+async function getBalance(apiKey) {
+  const query = `query { myself { clientBalance currentSpendPerHr } }`;
+  const data = await graphqlRequest(apiKey, query);
+  const m = (data && data.myself) || {};
+  return {
+    balance: typeof m.clientBalance === 'number' ? m.clientBalance : null,
+    spendPerHr: typeof m.currentSpendPerHr === 'number' ? m.currentSpendPerHr : 0,
+  };
+}
+
+// -----------------------------------------------------------------------------
 // Validate an API key by making a cheap authenticated call.
 // -----------------------------------------------------------------------------
 async function validateKey(apiKey) {
@@ -335,6 +348,7 @@ async function fetchPodLogs(podId) {
 
 module.exports = {
   validateKey,
+  getBalance,
   listGpuTypes,
   createPod,
   listPods,

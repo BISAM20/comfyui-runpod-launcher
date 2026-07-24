@@ -11,47 +11,60 @@ const fs = require('fs');
 const path = require('path');
 
 const dir = () => app.getPath('userData');
-const keyFile = () => path.join(dir(), 'apikey.bin');
+const secretFile = (name) => path.join(dir(), name + '.bin');
 const settingsFile = () => path.join(dir(), 'settings.json');
 
-function saveApiKey(apiKey) {
-  if (!apiKey) return;
+// --- generic encrypted secret storage (OS keychain / Windows DPAPI) ----------
+function saveSecret(name, value) {
+  if (!value) return;
+  const f = secretFile(name);
   if (safeStorage.isEncryptionAvailable()) {
-    const enc = safeStorage.encryptString(apiKey);
-    fs.writeFileSync(keyFile(), enc);
+    fs.writeFileSync(f, safeStorage.encryptString(value));
   } else {
-    // Fallback: still base64 it so it is not casually readable.
-    fs.writeFileSync(keyFile(), Buffer.from('plain:' + apiKey, 'utf8'));
+    // Fallback: mark it so we can read it back; still not plain-visible text.
+    fs.writeFileSync(f, Buffer.from('plain:' + value, 'utf8'));
   }
 }
 
-function getApiKey() {
+function getSecret(name) {
   try {
-    if (!fs.existsSync(keyFile())) return null;
-    const buf = fs.readFileSync(keyFile());
+    const f = secretFile(name);
+    if (!fs.existsSync(f)) return null;
+    const buf = fs.readFileSync(f);
     if (buf.slice(0, 6).toString('utf8') === 'plain:') {
       return buf.slice(6).toString('utf8');
     }
-    if (safeStorage.isEncryptionAvailable()) {
-      return safeStorage.decryptString(buf);
-    }
+    if (safeStorage.isEncryptionAvailable()) return safeStorage.decryptString(buf);
     return null;
   } catch {
     return null;
   }
 }
 
-function hasApiKey() {
-  return fs.existsSync(keyFile());
+function hasSecret(name) {
+  return fs.existsSync(secretFile(name));
 }
 
-function clearApiKey() {
+function clearSecret(name) {
   try {
-    if (fs.existsSync(keyFile())) fs.unlinkSync(keyFile());
+    const f = secretFile(name);
+    if (fs.existsSync(f)) fs.unlinkSync(f);
   } catch {
     /* ignore */
   }
 }
+
+// --- RunPod API key (kept as `apikey.bin` for backwards compatibility) -------
+const saveApiKey = (v) => saveSecret('apikey', v);
+const getApiKey = () => getSecret('apikey');
+const hasApiKey = () => hasSecret('apikey');
+const clearApiKey = () => clearSecret('apikey');
+
+// --- HuggingFace token (for gated / private models) --------------------------
+const saveHfToken = (v) => saveSecret('hftoken', v);
+const getHfToken = () => getSecret('hftoken');
+const hasHfToken = () => hasSecret('hftoken');
+const clearHfToken = () => clearSecret('hftoken');
 
 function loadSettings() {
   try {
@@ -75,6 +88,10 @@ module.exports = {
   getApiKey,
   hasApiKey,
   clearApiKey,
+  saveHfToken,
+  getHfToken,
+  hasHfToken,
+  clearHfToken,
   loadSettings,
   saveSettings,
 };

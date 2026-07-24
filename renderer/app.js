@@ -13,6 +13,8 @@ const state = {
   refreshTimer: null,
   pendingConfirm: null,
   progress: null, // { id, timer } for the open progress panel
+  balanceTimer: null,
+  hasHfToken: false,
 };
 
 // -----------------------------------------------------------------------------
@@ -87,7 +89,34 @@ async function afterLogin() {
     updateKillSwitchUI();
   }
   loadGpus();
+  loadBalance();
+  refreshHfStatus();
   updateSummary();
+
+  // Keep the cost meter current (balance + burn rate change while pods run).
+  clearInterval(state.balanceTimer);
+  state.balanceTimer = setInterval(loadBalance, 60000);
+}
+
+// Show whether a HuggingFace token is saved, in Settings and on the Deploy tab.
+async function refreshHfStatus() {
+  const res = await window.api.hasHfToken();
+  const saved = res.ok && res.data;
+  state.hasHfToken = saved;
+
+  const status = $('#hfTokenStatus');
+  status.textContent = saved
+    ? '✓ A token is saved (encrypted). Type a new one to replace it.'
+    : 'No token saved.';
+  status.style.color = saved ? 'var(--green)' : 'var(--muted)';
+
+  const hint = $('#hfDeployHint');
+  if (hint) {
+    hint.textContent = saved
+      ? '✓ Using your saved token from Settings — leave blank to use it.'
+      : 'No saved token. Add one here or in Settings for gated models.';
+    hint.style.color = saved ? 'var(--green)' : 'var(--muted)';
+  }
 }
 
 // Reflect the kill-switch setting in the hint + the sidebar "armed" badge.
@@ -333,8 +362,12 @@ async function deploy() {
   const models = selectedModels();
   for (const m of models) env[m.env] = 'true';
 
+  // A token typed here wins; otherwise the main process injects the saved one.
   const hfToken = $('#hfToken').value.trim();
-  if (hfToken) env.HF_TOKEN = hfToken;
+  if (hfToken) {
+    env.HF_TOKEN = hfToken;
+    window.api.saveHfToken(hfToken).then(refreshHfStatus); // remember for next time
+  }
 
   const opts = {
     name: $('#podName').value.trim() || 'comfyui-pod',
@@ -369,6 +402,7 @@ async function deploy() {
     msg.textContent =
       '✓ Pod created! It is booting now — open the My Pods tab to get your ComfyUI link.';
     toast('Pod deployed', 'ok');
+    setTimeout(loadBalance, 3000); // burn rate just changed
     setTimeout(() => showTab('pods'), 900);
   } else {
     msg.className = 'msg err';
@@ -565,6 +599,7 @@ async function podAction(act, id, name) {
           toast('Pod terminated', 'ok');
           state.pods = state.pods.filter((p) => p.id !== id);
           renderPods();
+          setTimeout(loadBalance, 2500);
         } else toast(res.error || 'Failed to terminate', 'err');
       }
     );
@@ -577,6 +612,7 @@ async function podAction(act, id, name) {
   if (res.ok) {
     toast(act === 'stop' ? 'Pod stopped' : 'Pod starting', 'ok');
     setTimeout(loadPods, 1200);
+    setTimeout(loadBalance, 2500); // burn rate changed
   } else {
     toast(res.error || 'Action failed', 'err');
   }
@@ -639,10 +675,24 @@ function wireEvents() {
       containerDisk: parseInt($('#containerDisk').value, 10) || 30,
       volumeDisk: parseInt($('#volumeDisk').value, 10) || 100,
     });
+    // Save the HF token only if a new one was typed (blank keeps the existing).
+    const hf = $('#settingsHfToken').value.trim();
+    if (hf) {
+      await window.api.saveHfToken(hf);
+      $('#settingsHfToken').value = '';
+      await refreshHfStatus();
+    }
     const msg = $('#settingsMsg');
     msg.className = 'msg success';
     msg.textContent = '✓ Settings saved.';
     setTimeout(() => msg.classList.add('hidden'), 2500);
+  });
+
+  $('#clearHfBtn').addEventListener('click', async () => {
+    await window.api.clearHfToken();
+    $('#settingsHfToken').value = '';
+    await refreshHfStatus();
+    toast('HuggingFace token removed', 'ok');
   });
   $('#changeKeyBtn').addEventListener('click', async () => {
     await window.api.clearApiKey();
@@ -687,6 +737,89 @@ function wireEvents() {
     if (state.pendingConfirm) state.pendingConfirm();
     state.pendingConfirm = null;
   });
+}
+
+// -----------------------------------------------------------------------------
+// Cost meter — balance, burn rate, and low-balance hints
+// -----------------------------------------------------------------------------
+// Thresholds are in hours of remaining runtime at the current spend rate; when
+// nothing is running we fall back to absolute dollar thresholds.
+const LOW_HOURS = 8;
+const CRITICAL_HOURS = 3;
+const LOW_DOLLARS = 10;
+const CRITICAL_DOLLARS = 3;
+
+function fmtMoney(n) {
+  return '$' + Number(n).toFixed(2);
+}
+
+function fmtHours(h) {
+  if (!isFinite(h)) return '';
+  if (h >= 48) return Math.round(h / 24) + 'd left';
+  if (h >= 1) return Math.floor(h) + 'h left';
+  return Math.max(1, Math.round(h * 60)) + 'm left';
+}
+
+async function loadBalance() {
+  const res = await window.api.balance();
+  const meter = $('#costMeter');
+  if (!res.ok || !res.data || res.data.balance == null) {
+    meter.classList.add('hidden'); // don't show a broken meter
+    return;
+  }
+  renderBalance(res.data);
+  meter.classList.remove('hidden');
+}
+
+function renderBalance(d) {
+  const { balance, spendPerHr } = d;
+  const hours = spendPerHr > 0 ? balance / spendPerHr : Infinity;
+
+  // Severity = the worse of the two signals. Time-remaining catches a fast
+  // burn on a healthy balance; the dollar floor catches a nearly-empty account
+  // even when it is draining slowly.
+  const rank = { ok: 0, low: 1, critical: 2 };
+  let byMoney = 'ok';
+  if (balance <= CRITICAL_DOLLARS) byMoney = 'critical';
+  else if (balance <= LOW_DOLLARS) byMoney = 'low';
+
+  let byTime = 'ok';
+  if (spendPerHr > 0) {
+    if (hours <= CRITICAL_HOURS) byTime = 'critical';
+    else if (hours <= LOW_HOURS) byTime = 'low';
+  }
+
+  const level = rank[byTime] >= rank[byMoney] ? byTime : byMoney;
+
+  const balEl = $('#cmBalance');
+  balEl.textContent = fmtMoney(balance);
+  balEl.className = 'cm-balance' + (level === 'ok' ? '' : ' ' + level);
+
+  // Bar: fraction of a $50 reference, so it visibly drains as funds drop.
+  const pct = Math.max(2, Math.min(100, (balance / 50) * 100));
+  const fill = $('#cmFill');
+  fill.style.width = pct + '%';
+  fill.className = 'cm-fill' + (level === 'ok' ? '' : ' ' + level);
+
+  $('#cmSpend').textContent = fmtMoney(spendPerHr) + '/hr';
+  $('#cmRuntime').textContent = spendPerHr > 0 ? fmtHours(hours) : 'idle';
+
+  const warn = $('#cmWarn');
+  if (level === 'critical') {
+    warn.textContent =
+      spendPerHr > 0
+        ? `⚠ Very low — about ${fmtHours(hours).replace(' left', '')} of runtime left. Add credit or stop your pods.`
+        : '⚠ Very low balance — add credit before deploying.';
+    warn.className = 'cm-warn critical';
+  } else if (level === 'low') {
+    warn.textContent =
+      spendPerHr > 0
+        ? `Running low — roughly ${fmtHours(hours).replace(' left', '')} left at the current rate.`
+        : 'Balance is getting low.';
+    warn.className = 'cm-warn low';
+  } else {
+    warn.className = 'cm-warn hidden';
+  }
 }
 
 // -----------------------------------------------------------------------------

@@ -154,6 +154,21 @@ handle('settings:saveDeployDefaults', async (obj) => {
   return true;
 });
 
+// --- HuggingFace token (encrypted, for gated/private models) ---
+handle('settings:hasHfToken', async () => store.hasHfToken());
+handle('settings:saveHfToken', async (token) => {
+  if (token) store.saveHfToken(token);
+  else store.clearHfToken();
+  return store.hasHfToken();
+});
+handle('settings:clearHfToken', async () => {
+  store.clearHfToken();
+  return true;
+});
+
+// --- Account balance / spend rate ---
+handle('runpod:balance', async () => runpod.getBalance(requireKey()));
+
 handle('settings:setOnClose', async (action) => {
   const valid = ['nothing', 'stop', 'terminate'];
   const s = store.loadSettings();
@@ -169,6 +184,12 @@ handle('runpod:gpuTypes', async () => runpod.listGpuTypes(requireKey()));
 
 handle('runpod:createPod', async (opts) => {
   const merged = { imageName: DEFAULT_IMAGE, ...opts };
+  // Inject the saved HuggingFace token unless the deploy form supplied one.
+  // Kept out of the renderer so the token never has to travel through the UI.
+  if (!merged.env || !merged.env.HF_TOKEN) {
+    const hf = store.getHfToken();
+    if (hf) merged.env = { ...(merged.env || {}), HF_TOKEN: hf };
+  }
   return runpod.createPod(requireKey(), merged);
 });
 
