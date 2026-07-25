@@ -177,6 +177,199 @@ size could not be measured). Several LTX-2.3 Creative Lab IC-LoRAs and the
 private Wan sliders are gated — set a **HuggingFace token** in Settings or they
 are skipped with `[SKIP] HF_TOKEN not set` in the download log.
 
+#### Every file, pack by pack
+
+<!-- studio-files:start -->
+Every file each pack downloads, by name.
+
+<details>
+<summary><b>LTX-2.3 Dev (22B)</b> — Full-precision base video model · 46.1 GB · 1 files</summary>
+
+- `ltx-2.3-22b-dev`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Dev FP8</b> — Quantised base model - less VRAM · 29.1 GB · 1 files</summary>
+
+- `ltx-2.3-22b-dev-fp8`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Distilled</b> — Faster few-step base model · 46.1 GB · 1 files</summary>
+
+- `ltx-2.3-22b-distilled-1.1`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Distilled FP8</b> — Quantised distilled model · 29.5 GB · 1 files</summary>
+
+- `ltx-2.3-22b-distilled-fp8`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Upscalers</b> — Spatial x1.5/x2 and temporal x2 upscalers · 3.3 GB · 4 files</summary>
+
+- `ltx-2.3-spatial-upscaler-x2-1.1`
+- `ltx-2.3-spatial-upscaler-x2-1.0`
+- `ltx-2.3-spatial-upscaler-x1.5-1.0`
+- `ltx-2.3-temporal-upscaler-x2-1.0`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Distill LoRA</b> — Few-step distill LoRAs for the base model · 15.2 GB · 2 files</summary>
+
+- `ltx-2.3-22b-distilled-lora-384-1.1`
+- `ltx-2.3-22b-distilled-lora-384`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Kijai pack</b> — Kijai fp8 transformers, VAEs, text projection · ~22 GB · 1 files</summary>
+
+- `main`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Official LoRAs</b> — Lightricks IC/ID LoRAs - control, upscale, lipdub, HDR · ~14 GB · 21 files</summary>
+
+- `ltx-2.3-22b-ic-lora-union-control-ref0.5`
+- `ltx-2.3-22b-ic-lora-motion-track-control-ref0.5`
+- `ltx-2.3-22b-ic-lora-ingredients-0.9`
+- `ltx-2.3-id-lora-celebvhq-3k`
+- `ltx-2.3-id-lora-talkvid-3k`
+- `ltx-2.3-22b-ic-lora-in-outpainting-0.9`
+- `ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x2-0.9`
+- `ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9`
+- `ltx-2.3-22b-ic-lora-lipdub-0.9`
+- `ltx-2.3-22b-ic-lora-hdr-0.9`
+- `ltx-2.3-22b-ic-lora-hdr-scene-emb`
+- `ltx-2.3-22b-ic-lora-instant-shave-0.9`
+- `ltx-2.3-22b-ic-lora-clean-plate-1.0`
+- `ltx-2.3-22b-ic-lora-colorization-0.9`
+- `ltx-2.3-22b-ic-lora-day-to-night-0.9`
+- `ltx-2.3-22b-ic-lora-deblur-0.9`
+- `ltx-2.3-22b-ic-lora-decompression-0.9`
+- `ltx-2.3-22b-ic-lora-water-simulation-0.9`
+- `ltx-2.3-22b-ic-lora-cross-eyed-0.9`
+- `ltx-2.3-22b-lora-cinemagraph-0.9`
+- `ltx-2.3-22b-lora-foley-v2a-1.0`
+
+</details>
+
+<details>
+<summary><b>LTX-2.3 Community LoRAs</b> — Community styles + Gemma abliterated encoders · 5.3 GB · 7 files</summary>
+
+- `googlyeyes-ltx-2.3-rank32-step03000`
+- `ltx-2.3-22b-ic-lora-outpaint`
+- `lora_weights_step_05000`
+- `LTX23_Obscura_Remova_v1`
+- `ltx2.3-transition`
+- `gemma-3-12b-it-abliterated_lora_rank64_bf16`
+- `gemma-3-12b-it-abliterated_heretic_lora_rank64_bf16`
+
+</details>
+
+<details>
+<summary><b>Krea 2 Turbo</b> — Fast image model - fp8 + int8 · 26.6 GB · 2 files</summary>
+
+- `krea2_turbo_fp8_scaled`
+- `krea2_turbo_int8_convrot`
+
+</details>
+
+<details>
+<summary><b>Krea 2 RAW</b> — Photographic RAW model + turbo LoRA · 13.6 GB · 2 files</summary>
+
+- `krea2_raw_fp8_scaled`
+- `krea2_turbo_lora_rank_64_bf16`
+
+</details>
+
+**Krea 2 LoRAs** — Krea 2 style LoRAs (file list not published)
+
+<details>
+<summary><b>FLUX.2 Klein 9B (fp8)</b> — Klein 9B image model, fp8 + base · ~20 GB · 2 files</summary>
+
+- `flux-2-klein-9b-fp8`
+- `flux-2-klein-base-9b-fp8`
+
+</details>
+
+<details>
+<summary><b>FLUX.2 Klein 9B (bf16)</b> — Full-precision Klein 9B · ~34 GB · 1 files</summary>
+
+- `flux-2-klein-9b`
+
+</details>
+
+<details>
+<summary><b>FLUX.2 Klein extras</b> — BiRefNet, SeedVR2, VAE, ref-control, BFS head · 10.1 GB · 5 files</summary>
+
+- `birefnet`
+- `seedvr2_7b_int8_convrot`
+- `ema_vae_fp16`
+- `refcontrol_v2_poses`
+- `bfs_head_v1_flux-klein_9b_step3500_rank128`
+
+</details>
+
+<details>
+<summary><b>Wan 2.2 Text-to-Video</b> — High + low noise fp8 (14B) · 28.6 GB · 2 files</summary>
+
+- `wan2.2_t2v_high_noise_14B_fp8_scaled`
+- `wan2.2_t2v_low_noise_14B_fp8_scaled`
+
+</details>
+
+<details>
+<summary><b>Wan 2.2 Image-to-Video</b> — High + low noise fp8 (14B) · 28.6 GB · 2 files</summary>
+
+- `wan2.2_i2v_high_noise_14B_fp8_scaled`
+- `wan2.2_i2v_low_noise_14B_fp8_scaled`
+
+</details>
+
+<details>
+<summary><b>Wan Animate v2</b> — Animate 14B fp8 + YOLO/ViTPose detection · 18.6 GB · 3 files</summary>
+
+- `Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2`
+- `yolov10m`
+- `vitpose-l-wholebody`
+
+</details>
+
+<details>
+<summary><b>Mocha (preview)</b> — Wan2.1-based preview model · 14.3 GB · 1 files</summary>
+
+- `Wan2_1_mocha-14B-preview_fp8_e4m3fn_scaled_KJ`
+
+</details>
+
+<details>
+<summary><b>Wan LoRAs</b> — lightx2v 4-step, SVI, relight + private sliders · ~12 GB · 12 files</summary>
+
+- `wan2.2_animate_14B_relight_lora_bf16`
+- `high_noise_model`
+- `low_noise_model`
+- `wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022`
+- `wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022`
+- `SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16`
+- `SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16`
+- `Bishoy_wan2.1_t2v`
+- `Gender_sleder_2`
+- `concept_slider_wan2.1_age`
+- `crowds_slider`
+- `weight_slider_wan2.1_T2V`
+
+</details>
+<!-- studio-files:end -->
+
 ### Workflows
 
 Baked in and available in ComfyUI's **Workflows** panel:
@@ -192,6 +385,126 @@ Baked in and available in ComfyUI's **Workflows** panel:
 | `Wan2.2/` | Hearmeman Wan 2.2 workflows |
 | `Wan-Animate/` | Hearmeman Wan Animate + KJ WanAnimate examples |
 | `Wan-MoCha/` | KJ MoCha examples |
+
+<!-- studio-workflows:start -->
+Every workflow baked into the image, by name. They appear in ComfyUI's
+**Workflows** panel under these folders.
+
+<details>
+<summary><b>LTX-2.3/</b> — official Lightricks examples · 12 workflows</summary>
+
+- `LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full` — text/image → video, one stage
+- `LTX-2.3_T2V_I2V_Two_Stage_Distilled` — text/image → video, two stage
+- `LTX-2.3_V2V_ICLoRA_Single_Stage_Distilled` — video → video
+- `LTX-2.3_T2A_Single_Stage_Distilled` — text → audio
+- `LTX-2.3_ICLoRA_Union_Control_Distilled` — union control
+- `LTX-2.3_ICLoRA_Motion_Track_Distilled` — motion tracking
+- `LTX-2.3_ICLoRA_Ingredients_Single_Stage_Distilled` — ingredients / reference
+- `LTX-2.3_ICLoRA_Inpaint_Two_Stage_Distilled` — inpainting
+- `LTX-2.3_ICLoRA_Outpaint_Two_Stage_Distilled` — outpainting
+- `LTX-2.3_ICLoRA_Lipdub_Two_Stage_Distilled` — lip sync / dubbing
+- `LTX-2.3_ICLoRA_HDR_Distilled` — HDR
+- `LTX-2.3_ICLoRA_Pixel_Spatial_Upscaler_Distilled` — pixel spatial upscale
+
+</details>
+
+<details>
+<summary><b>LTX-2.3-community/</b> — Comfy-Org templates · 8 workflows</summary>
+
+- `template_ltx2_3_ic_lora_ingredients`
+- `template_ltx2_3_lora_googly_eyes`
+- `template_ltx2_3_lora_remove_subtitles_from_video`
+- `template_ltx2_3_lora_restore_archival_footage`
+- `template_ltx2_3_lora_video_outpainting`
+- `template_ltx2_3_obscura_remova_lora_remove_object_from_video`
+- `template_ltx2_3_remove_watermark_from_video`
+- `template_ltx2_3_style_transition`
+
+</details>
+
+<details>
+<summary><b>WhatDreamsCost/</b> — LTX Director / first-last-frame · 4 workflows</summary>
+
+- `LTX_Director_2_Workflow_Hotfix`
+- `LTX I2V First Last Frame 2 Stage Workflow v6`
+- `LTX I2V First Last Frame 3 Stage Workflow v6`
+- `LTX I2V FFLF Custom Audio Workflow - SUPPORTS LATEST COMFYUI VERSION - V3`
+
+</details>
+
+<details>
+<summary><b>Krea2/</b> — Comfy-Org templates · 3 workflows</summary>
+
+- `image_krea2_turbo_t2i` — text → image
+- `image_krea2_turbo_t2i_int8` — text → image, int8
+- `image_krea2_turbo_int8_image_style_reference` — style reference
+
+</details>
+
+<details>
+<summary><b>FLUX2-Klein/</b> — one-node pipeline, NKD tools, Comfy-Org · 16 workflows</summary>
+
+One-node FLUX.2 Klein pipeline:
+- `t2i_workflow` — text → image
+- `i2i_workflow` — image → image
+- `edit_workflow` — instruction edit
+- `inpaint_workflow` — inpainting
+- `outpaint_workflow` — outpainting
+- `faceswap_workflow` — face swap
+- `pose_workflow` — pose control
+- `remove_bg_workflow` — background removal
+- `upscale_workflow` — upscale
+
+NKD Klein Tools:
+- `NKD Klein Tools`
+
+Comfy-Org templates:
+- `image_flux2_klein_text_to_image`
+- `image_flux2_klein_9b_kv_image_edit`
+- `image_flux2_klein_image_edit_9b_base`
+- `image_flux2_klein_image_edit_9b_distilled`
+- `image_flux2_klein_image_edit_4b_base`
+- `image_flux2_klein_image_edit_4b_distilled`
+
+</details>
+
+<details>
+<summary><b>Wan2.2/</b> — Hearmeman · 9 workflows</summary>
+
+- `Wan2.2_T2V` — text → video
+- `Wan2.2_I2V` — image → video
+- `Wan2.2_T2V_60FPS` / `Wan2.2_I2V_60FPS` — 60 fps
+- `Wan2.2_T2V_RES4LYF_Nodes` / `Wan2.2_I2V_RES4LYF_Nodes` — slower, better quality
+- `Wan2.2_5B_T2V_60FPS` / `Wan2.2_5B_I2V_60FPS` — faster, 5B model
+- `Wan2.2_Text-To-Image` — text → image
+
+</details>
+
+<details>
+<summary><b>Wan-Animate/</b> — Hearmeman + KJ · 4 workflows</summary>
+
+- `Wan_Animate_V2_HearmemanAI`
+- `Wan_Animate_Replace_Person`
+- `wanvideo_WanAnimate_example_01`
+- `wanvideo_WanAnimate_preprocess_example_02`
+
+</details>
+
+<details>
+<summary><b>Wan-MoCha/</b> — KJ wrapper · 1 workflow</summary>
+
+- `wanvideo_2_1_14B_MoCha_replace_subject_KJ_02`
+
+</details>
+
+<details>
+<summary><b>LTX-Video-other/</b> — earlier LTX-Video examples</summary>
+
+The remaining top-level examples from `ComfyUI-LTXVideo` (LTX-2 and earlier),
+kept for reference.
+
+</details>
+<!-- studio-workflows:end -->
 
 Workflow templates refresh on every pod start, so new upstream templates appear
 without rebuilding the image (`AUTO_UPDATE_TEMPLATES=false` disables this).
