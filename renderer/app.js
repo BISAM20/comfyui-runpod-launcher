@@ -9,6 +9,10 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 // (room for generated outputs, ComfyUI cache, and model variance).
 const VOLUME_HEADROOM_GB = 50;
 
+// Assumed size for a model whose image publishes no size, so auto-sizing stays
+// on the safe side rather than under-provisioning the volume.
+const UNKNOWN_MODEL_GB = 25;
+
 const state = {
   gpus: [],
   selectedGpu: null,
@@ -20,6 +24,7 @@ const state = {
   balanceTimer: null,
   hasHfToken: false,
   volumeManual: false, // true once the user edits the volume size themselves
+  catalogImage: null, // image the current model catalog was loaded for
 };
 
 // -----------------------------------------------------------------------------
@@ -291,18 +296,27 @@ async function loadModelCatalog() {
   // Preserve the user's ticks across a re-render (boot replaces the fallback
   // list, and "Reload list" refetches it).
   const checked = new Set(selectedModels().map((m) => m.env));
-  const res = await window.api.modelManifest();
   const note = $('#modelSource');
+  note.textContent = 'Reading model list from the image…';
+  note.style.color = 'var(--muted)';
+
+  const image = $('#imageName').value.trim();
+  const res = await window.api.modelManifest(image);
+
   if (res.ok && res.data && res.data.models.length) {
     window.MODEL_CATALOG = res.data.models;
-    note.textContent = `✓ ${res.data.models.length} models from the image manifest`;
+    const unknown = res.data.models.filter((m) => !m.gb).length;
+    note.textContent =
+      `✓ ${res.data.models.length} models from ${res.data.source || 'the image'}` +
+      (unknown ? ` — ${unknown} without a published size` : '');
     note.style.color = 'var(--green)';
   } else {
     window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
     note.textContent =
-      'Using the built-in list — the image manifest was not reachable.';
-    note.style.color = 'var(--muted)';
+      'Using the built-in list — could not read the model list from this image.';
+    note.style.color = 'var(--amber)';
   }
+  state.catalogImage = image;
   renderModelList();
   // Restore ticks for models that still exist in the new list.
   for (const input of $$('#modelList input')) {
@@ -325,7 +339,7 @@ function renderModelList() {
         <div class="m-name">${escapeHtml(m.name)}</div>
         <div class="m-desc">${escapeHtml(m.desc)}</div>
       </div>
-      <div class="m-size">+${m.gb} GB</div>
+      <div class="m-size">${m.gb ? '+' + m.gb + ' GB' : 'size ?'}</div>
     `;
     row.querySelector('input').addEventListener('change', updateSummary);
     container.appendChild(row);
@@ -349,10 +363,16 @@ function updateSummary() {
   $('#summaryRate').textContent = avail ? `$${avail.price.toFixed(2)}/hr` : '—';
 
   const models = selectedModels();
-  const modelGb = models.reduce((s, m) => s + m.gb, 0);
+  // Some images publish no sizes; assume a conservative amount for those so the
+  // volume is never under-provisioned.
+  const unknown = models.filter((m) => !m.gb).length;
+  const modelGb =
+    models.reduce((s, m) => s + m.gb, 0) + unknown * UNKNOWN_MODEL_GB;
   // Models + shared encoders/VAE/CLIP + 50 GB working headroom for outputs.
   const needed = Math.ceil(modelGb + (modelGb ? 8 : 0)) + VOLUME_HEADROOM_GB;
-  $('#summaryDisk').textContent = modelGb ? `~${Math.ceil(modelGb + 8)} GB` : 'bare';
+  $('#summaryDisk').textContent = modelGb
+    ? `${unknown ? '≥' : '~'}${Math.ceil(modelGb + 8)} GB`
+    : 'bare';
 
   // Auto-size the volume unless the user has typed their own value.
   const volInput = $('#volumeDisk');
@@ -710,6 +730,16 @@ function wireEvents() {
 
   $('#refreshGpuBtn').addEventListener('click', loadGpus);
   $('#refreshModelsBtn').addEventListener('click', loadModelCatalog);
+
+  // Changing the image changes which models exist — reload the catalog once
+  // the user stops typing.
+  let imgTimer = null;
+  $('#imageName').addEventListener('input', () => {
+    clearTimeout(imgTimer);
+    imgTimer = setTimeout(() => {
+      if ($('#imageName').value.trim() !== state.catalogImage) loadModelCatalog();
+    }, 900);
+  });
   $('#refreshPodsBtn').addEventListener('click', loadPods);
   $('#deployBtn').addEventListener('click', deploy);
   // Typing a volume size switches to manual; clearing it returns to auto.

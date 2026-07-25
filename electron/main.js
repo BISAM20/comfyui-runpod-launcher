@@ -173,10 +173,12 @@ handle('runpod:balance', async () => runpod.getBalance(requireKey()));
 // Tries, in order: the configured manifest URL, then any running pod (which
 // serves /models.json on its log server). The renderer falls back to its
 // bundled list if both fail, so the UI always works.
-handle('runpod:modelManifest', async () => {
+handle('runpod:modelManifest', async (imageOverride) => {
   const settings = store.loadSettings();
   const url = (settings.manifestUrl || '').trim();
+  const image = (imageOverride || settings.image || DEFAULT_IMAGE || '').trim();
 
+  // 1. Explicit manifest URL wins.
   if (url) {
     try {
       return await runpod.fetchModelManifest({ url });
@@ -185,13 +187,25 @@ handle('runpod:modelManifest', async () => {
     }
   }
 
-  // No URL (or it failed) — try a running pod.
+  // 2. Read the catalog from the image itself on Docker Hub. Works before any
+  //    pod exists, and always matches the image that will be deployed.
+  if (image) {
+    try {
+      return await runpod.fetchManifestFromRegistry(image);
+    } catch (e) {
+      log.error('Image catalog read failed: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // 3. Fall back to a running pod on that same image (rich models.json).
   const key = store.getApiKey();
   if (key) {
     try {
       const pods = await runpod.listPods(key);
       const running = pods.find(
-        (p) => (p.desiredStatus || '').toUpperCase() === 'RUNNING'
+        (p) =>
+          (p.desiredStatus || '').toUpperCase() === 'RUNNING' &&
+          (!image || p.image === image)
       );
       if (running) return await runpod.fetchModelManifest({ podId: running.id });
     } catch (e) {

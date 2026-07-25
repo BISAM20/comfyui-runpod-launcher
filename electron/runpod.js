@@ -351,6 +351,148 @@ async function fetchModelManifest({ url, podId }) {
   return { models: clean, source: url ? 'url' : 'pod', image: data.image || null };
 }
 
+// -----------------------------------------------------------------------------
+// Read the model catalog straight from the image on Docker Hub.
+//
+// This works BEFORE any pod exists, and for any public image. Two sources, best
+// first:
+//   1. a `com.comfyui.models` label holding the rich catalog JSON (names,
+//      descriptions, sizes) — present on images built for this launcher;
+//   2. otherwise the image's own DOWNLOAD_* environment variables, which every
+//      ComfyUI image of this family declares. Names are humanised and sizes are
+//      unknown, but the list is always correct for that image.
+// -----------------------------------------------------------------------------
+const REGISTRY = 'https://registry-1.docker.io/v2';
+const MANIFEST_ACCEPT = [
+  'application/vnd.docker.distribution.manifest.v2+json',
+  'application/vnd.oci.image.manifest.v1+json',
+  'application/vnd.docker.distribution.manifest.list.v2+json',
+  'application/vnd.oci.image.index.v1+json',
+].join(',');
+
+// "bishoy22/comfyui-wan:latest" -> { repo: 'bishoy22/comfyui-wan', tag: 'latest' }
+function parseImageRef(image) {
+  const ref = String(image || '').trim();
+  if (!ref) throw new Error('No image name set');
+  // Only Docker Hub is supported for metadata reads.
+  if (/^[^/]+\.[^/]+\//.test(ref)) throw new Error('Only Docker Hub images supported');
+  const [namePart, tagPart] = ref.split(':');
+  const repo = namePart.includes('/') ? namePart : `library/${namePart}`;
+  return { repo, tag: tagPart || 'latest' };
+}
+
+async function registryConfig(image) {
+  const { repo, tag } = parseImageRef(image);
+
+  const tokenRes = await fetchWithTimeout(
+    `https://auth.docker.io/token?service=registry.docker.io&scope=repository:${repo}:pull`,
+    9000
+  );
+  if (!tokenRes.ok) throw new Error('Could not authenticate with Docker Hub');
+  const { token } = await tokenRes.json();
+
+  const headers = { Authorization: `Bearer ${token}`, Accept: MANIFEST_ACCEPT };
+
+  let res = await fetchWithTimeout(`${REGISTRY}/${repo}/manifests/${tag}`, 12000, { headers });
+  if (!res.ok) throw new Error(`Image not found on Docker Hub (${res.status})`);
+  let manifest = await res.json();
+
+  // Multi-arch index → pick the linux/amd64 manifest.
+  if (Array.isArray(manifest.manifests) && manifest.manifests.length) {
+    const amd =
+      manifest.manifests.find(
+        (m) => m.platform && m.platform.architecture === 'amd64' && m.platform.os === 'linux'
+      ) || manifest.manifests[0];
+    res = await fetchWithTimeout(`${REGISTRY}/${repo}/manifests/${amd.digest}`, 12000, { headers });
+    if (!res.ok) throw new Error('Could not read image manifest');
+    manifest = await res.json();
+  }
+
+  const digest = manifest.config && manifest.config.digest;
+  if (!digest) throw new Error('Image has no config blob');
+
+  // fetch() follows the blob redirect automatically.
+  const blob = await fetchWithTimeout(`${REGISTRY}/${repo}/blobs/${digest}`, 15000, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!blob.ok) throw new Error('Could not read image config');
+  const cfg = await blob.json();
+  return cfg.config || {};
+}
+
+// DOWNLOAD_WAN22_T2V -> "Wan22 T2V";  DOWNLOAD_LTX23_DEV_FP8 -> "LTX23 Dev FP8"
+function humaniseEnv(env) {
+  const KEEP = new Set([
+    'T2V', 'I2V', 'V2V', 'FP8', 'FP16', 'BF16', 'GGUF', 'ONNX', 'VACE', 'LTX',
+    'SVI', 'RAW', 'HD', 'AI', '2D', '3D',
+  ]);
+  // Tokens stay upper-case when they are known acronyms, very short, or
+  // version-like (contain a digit) — e.g. WAN22, LTX23, T2V, VACE.
+  const keepUpper = (w) =>
+    KEEP.has(w) || w.length <= 4 || (/\d/.test(w) && w.length <= 6);
+
+  return env
+    .replace(/^DOWNLOAD_/, '')
+    .split('_')
+    .filter(Boolean)
+    .map((w) =>
+      keepUpper(w) ? w : w.charAt(0) + w.slice(1).toLowerCase()
+    )
+    .join(' ');
+}
+
+function normaliseModels(models) {
+  return models
+    .filter((m) => m && typeof m.env === 'string' && typeof m.name === 'string')
+    .map((m) => ({
+      env: m.env,
+      name: m.name,
+      desc: typeof m.desc === 'string' ? m.desc : '',
+      gb: Number(m.gb) > 0 ? Number(m.gb) : 0, // 0 = size unknown
+      needsHfToken: !!m.needsHfToken,
+    }));
+}
+
+async function fetchManifestFromRegistry(image) {
+  const cfg = await registryConfig(image);
+
+  // 1) Rich catalog in a label (JSON, optionally base64-encoded).
+  const labels = cfg.Labels || {};
+  const raw = labels['com.comfyui.models'] || labels['com.bishoy.comfyui.models'];
+  if (raw) {
+    try {
+      const text = raw.trim().startsWith('{') || raw.trim().startsWith('[')
+        ? raw
+        : Buffer.from(raw, 'base64').toString('utf8');
+      const parsed = JSON.parse(text);
+      const models = normaliseModels(Array.isArray(parsed) ? parsed : parsed.models || []);
+      if (models.length) {
+        log.ok(`Model catalog from image label (${models.length} models)`);
+        return { models, source: 'image label', image };
+      }
+    } catch (e) {
+      log.error('Image label catalog was invalid, falling back to env vars');
+    }
+  }
+
+  // 2) Derive from the image's own DOWNLOAD_* env vars.
+  const envs = (cfg.Env || [])
+    .map((e) => String(e).split('=')[0])
+    .filter((n) => /^DOWNLOAD_[A-Z0-9_]+$/.test(n));
+  const unique = [...new Set(envs)];
+  if (!unique.length) throw new Error('Image declares no DOWNLOAD_* models');
+
+  const models = unique.map((env) => ({
+    env,
+    name: humaniseEnv(env),
+    desc: 'Declared by the image',
+    gb: 0,
+    needsHfToken: /LORA/.test(env),
+  }));
+  log.ok(`Model catalog from image env vars (${models.length} models)`);
+  return { models, source: 'image env vars', image };
+}
+
 // Tail the in-image log server. Returns combined text of the available logs.
 // Throws a clear error when the log server isn't reachable (old image / still
 // booting).
@@ -394,6 +536,7 @@ module.exports = {
   probeComfy,
   fetchPodLogs,
   fetchModelManifest,
+  fetchManifestFromRegistry,
   COMFYUI_PORT,
   JUPYTER_PORT,
   LOG_PORT,

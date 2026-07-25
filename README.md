@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.2.0-6d5efc)
+![Version](https://img.shields.io/badge/version-1.2.1-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -105,11 +105,18 @@ image**.
 
 ### Model catalog (`models.json`)
 
-The list of downloadable models is defined by the **image**, not the app. The
-image ships a `models.json` and publishes it on the log server, so the app reads
-the catalog from any running pod — or from a URL set in
-**Settings → Model manifest URL**. If neither is reachable, the app falls back to
-a built-in list.
+The list of downloadable models is defined by the **image**, not the app — point
+the app at a different image and the model list changes to match. The catalog is
+resolved in this order, all before any pod exists:
+
+1. **Manifest URL** — if one is set in **Settings → Model manifest URL**.
+2. **The image on Docker Hub** — a `com.comfyui.models` label carrying the full
+   catalog (names, descriptions, sizes). Images without that label still work:
+   the app reads their `DOWNLOAD_*` environment variables and lists those, with
+   sizes shown as unknown.
+3. **A running pod** on the same image, which serves `models.json` on port 8189.
+
+If none are reachable, the app falls back to a built-in list.
 
 ```json
 {
@@ -124,8 +131,9 @@ a built-in list.
 }
 ```
 
-Add a model to the image (a `DOWNLOAD_*` flag in `start.sh` plus an entry here)
-and it appears in the app automatically.
+Add a model to the image (a `DOWNLOAD_*` flag in `start.sh` plus an entry here),
+run `node gen-label.js` to refresh the image label, rebuild, and it appears in
+the app automatically.
 
 ---
 
@@ -153,8 +161,9 @@ npm run dist       # build the Windows installer into release/
 | `electron/preload.js` | Safe bridge exposed to the UI. |
 | `renderer/` | UI — `index.html`, `styles.css`, `app.js`, `models.js`. |
 
-To add or remove a downloadable model, edit `renderer/models.js` — one entry per
-model, mapped to its `DOWNLOAD_*` flag.
+`renderer/models.js` holds only the offline **fallback** catalog. The real model
+list comes from the Docker image — see [Model catalog](#model-catalog-modelsjson)
+above.
 
 ---
 
