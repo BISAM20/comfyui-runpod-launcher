@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.2.1-6d5efc)
+![Version](https://img.shields.io/badge/version-1.3.0-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -55,8 +55,9 @@ click **More info → Run anyway**.
 - **Automatic volume sizing** — the volume disk is sized from the models you
   select, plus 50 GB of headroom. Override it any time.
 - **Model list comes from the image** — the downloadable models are published by
-  the Docker image itself (`models.json`), so updating the image updates the app's
-  list. No app rebuild needed.
+  the Docker image itself, so pointing the app at a different image changes the
+  list to match. Each pack can be expanded to show exactly which files and LoRAs
+  it contains before you download it.
 - **HuggingFace token** — saved encrypted for gated or private models.
 - **Pod management** — live status, direct **Open ComfyUI** and **JupyterLab**
   links, and **Stop** / **Start** / **Terminate** controls.
@@ -125,11 +126,19 @@ If none are reachable, the app falls back to a built-in list.
       "env": "DOWNLOAD_WAN22_T2V",
       "name": "Wan 2.2 — Text-to-Video",
       "desc": "High + low noise fp8 (14B)",
-      "gb": 28.6
+      "gb": 28.6,
+      "items": [
+        "wan2.2_t2v_high_noise_14B_fp8_scaled",
+        "wan2.2_t2v_low_noise_14B_fp8_scaled"
+      ]
     }
   ]
 }
 ```
+
+`items` is optional — when present, the app shows an expandable list so you can
+see exactly which models and LoRAs a pack contains. `approx: true` marks a size
+as an estimate.
 
 Add a model to the image (a `DOWNLOAD_*` flag in `start.sh` plus an entry here),
 run `node gen-label.js` to refresh the image label, rebuild, and it appears in

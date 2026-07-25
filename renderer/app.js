@@ -329,17 +329,30 @@ function renderModelList() {
   const container = $('#modelList');
   container.innerHTML = '';
   for (const m of window.MODEL_CATALOG) {
-    const row = document.createElement('label');
+    const items = m.items || [];
+    const sizeText = m.gb ? `${m.approx ? '≈' : '+'}${m.gb} GB` : 'size ?';
+
+    // A model pack lists what it actually contains, so you can see which
+    // LoRAs/files you are about to download.
+    const contents = items.length
+      ? `<details class="m-items">
+           <summary>${items.length} file${items.length > 1 ? 's' : ''}</summary>
+           <ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+         </details>`
+      : '';
+
+    const row = document.createElement('div');
     row.className = 'model-row';
     row.innerHTML = `
-      <input type="checkbox" data-env="${m.env}" data-gb="${m.gb}" ${
+      <input type="checkbox" id="mdl-${m.env}" data-env="${m.env}" data-gb="${m.gb}" ${
       m.needsHfToken ? 'data-hf="1"' : ''
     } />
-      <div>
-        <div class="m-name">${escapeHtml(m.name)}</div>
+      <div class="m-main">
+        <label class="m-name" for="mdl-${m.env}">${escapeHtml(m.name)}</label>
         <div class="m-desc">${escapeHtml(m.desc)}</div>
+        ${contents}
       </div>
-      <div class="m-size">${m.gb ? '+' + m.gb + ' GB' : 'size ?'}</div>
+      <div class="m-size">${sizeText}</div>
     `;
     row.querySelector('input').addEventListener('change', updateSummary);
     container.appendChild(row);

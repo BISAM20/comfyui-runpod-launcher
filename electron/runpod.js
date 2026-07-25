@@ -450,6 +450,8 @@ function normaliseModels(models) {
       desc: typeof m.desc === 'string' ? m.desc : '',
       gb: Number(m.gb) > 0 ? Number(m.gb) : 0, // 0 = size unknown
       needsHfToken: !!m.needsHfToken,
+      approx: !!m.approx, // size is an estimate, not measured
+      items: Array.isArray(m.items) ? m.items.filter((s) => typeof s === 'string') : [],
     }));
 }
 

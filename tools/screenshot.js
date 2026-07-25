@@ -40,8 +40,9 @@ app.whenReady().then(async () => {
       var ms = document.querySelectorAll('#modelList input');
       if (ms[0]) ms[0].click();   // Wan 2.2 T2V  (28.6 GB)
       if (ms[2]) ms[2].click();   // Wan 2.1 VACE  (9.5 GB)
+      var d = document.querySelectorAll('.m-items')[0]; if (d) d.open = true;
       var c = document.querySelector('.content');
-      if (c) c.scrollTop = 0;   // show the header in the hero shot
+      if (c) c.scrollTop = 0;    // show the header in the hero shot
     })();
   `);
   await shoot(win, '01-deploy');

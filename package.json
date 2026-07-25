@@ -1,6 +1,6 @@
 {
   "name": "comfyui-runpod-launcher",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "One-click launcher to deploy your ComfyUI Docker image on RunPod GPUs",
   "author": "Bishoy",
   "license": "MIT",

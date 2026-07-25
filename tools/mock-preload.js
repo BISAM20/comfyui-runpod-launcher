@@ -66,7 +66,7 @@ contextBridge.exposeInMainWorld('api', {
       { env: 'DOWNLOAD_WAN_ANIMATE_V2', name: 'Wan Animate v2', desc: 'fp8 + ONNX pose models', gb: 17.5 },
       { env: 'DOWNLOAD_MOCHA', name: 'Mocha (preview)', desc: 'Wan2.1-based fp8', gb: 14.3 },
       { env: 'DOWNLOAD_LTX', name: 'LTX-2.3 (22B)', desc: 'Model + Gemma encoder + upscalers + control LoRAs', gb: 55 },
-      { env: 'DOWNLOAD_LORAS', name: 'All LoRAs', desc: 'FusionX, lightx2v, SVI + private LoRAs (needs HF token)', gb: 10, needsHfToken: true },
+      { env: 'DOWNLOAD_LORAS', name: 'All LoRAs', desc: 'FusionX, lightx2v, SVI + private LoRAs (needs HF token)', gb: 10, needsHfToken: true, items: ['Wan2.1_T2V_14B_FusionX_LoRA','Wan21_CausVid_14B_T2V_lora_rank32','lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16','t2v_lightx2v_high_noise_lora','t2v_lightx2v_low_noise_lora','SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16','concept_slider_wan2.1_age','crowds_slider'] },
     ],
   }),
   gpuTypes: () => ok(GPUS),
