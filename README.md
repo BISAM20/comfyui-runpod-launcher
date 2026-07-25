@@ -12,6 +12,15 @@ the pod. All from one window.
 
 ---
 
+**[Download](#download)** · **[Screenshots](#screenshots)** ·
+**[Features](#features)** · **[Getting started](#getting-started)** ·
+**[Images](#the-docker-images-it-deploys)** ·
+**[Studio models & workflows](#comfyui-studio--models--workflows)** ·
+**[Build from source](#build-from-source)** ·
+**[Version history](#version-history)**
+
+---
+
 ## Download
 
 **[⬇ Download the latest installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)**
@@ -88,10 +97,18 @@ terminating.
 
 ---
 
-## The Docker image it deploys
+## The Docker images it deploys
 
-By default the launcher deploys `bishoy22/comfyui-wan:latest` — a self-contained
-ComfyUI image (ComfyUI + 35 custom nodes + Wan / LTX workflows) that exposes:
+Any ComfyUI image that uses `DOWNLOAD_*` environment variables works. Two are
+maintained for this launcher — set one in **Settings → Docker image**:
+
+| Image | Focus |
+|---|---|
+| `bishoy22/comfyui-studio:latest` | LTX-2.3 · Krea 2 · FLUX.2 Klein · Wan 2.x |
+| `bishoy22/comfyui-wan:latest` | Wan 2.1 / 2.2 video + LTX-2.3 |
+
+Both are self-contained (ComfyUI installed directly on a CUDA base, launched by
+their own `start.sh`) and expose:
 
 | Port | Service |
 |---|---|
@@ -101,8 +118,92 @@ ComfyUI image (ComfyUI + 35 custom nodes + Wan / LTX workflows) that exposes:
 
 Models are downloaded on demand via `DOWNLOAD_*` environment variables the app
 sets for you, and are stored on the pod's `/workspace` volume so they survive
-Stop/Start. You can point the app at a different image in **Settings → Docker
-image**.
+Stop/Start.
+
+---
+
+## `comfyui-studio` — models & workflows
+
+Nothing is baked into the image except ComfyUI, the nodes and the workflows —
+models download only when you tick them. **~421 GB if you selected everything**,
+so pick per project; the app sizes the volume for you.
+
+### Models
+
+<!-- studio-models:start -->
+**LTX-2.3 — video**
+
+| Pack | What it is | Size | Files |
+|---|---|---|---|
+| **LTX-2.3 Dev (22B)** | Full-precision base video model | 46.1 GB | 1 |
+| **LTX-2.3 Dev FP8** | Quantised base model - less VRAM | 29.1 GB | 1 |
+| **LTX-2.3 Distilled** | Faster few-step base model | 46.1 GB | 1 |
+| **LTX-2.3 Distilled FP8** | Quantised distilled model | 29.5 GB | 1 |
+| **LTX-2.3 Upscalers** | Spatial x1.5/x2 and temporal x2 upscalers | 3.3 GB | 4 |
+| **LTX-2.3 Distill LoRA** | Few-step distill LoRAs for the base model | 15.2 GB | 2 |
+| **LTX-2.3 Kijai pack** | Kijai fp8 transformers, VAEs, text projection | ~22 GB | 1 |
+| **LTX-2.3 Official LoRAs** | Lightricks IC/ID LoRAs - control, upscale, lipdub, HDR | ~14 GB | 21 |
+| **LTX-2.3 Community LoRAs** | Community styles + Gemma abliterated encoders | 5.3 GB | 7 |
+
+**Krea 2 — image**
+
+| Pack | What it is | Size | Files |
+|---|---|---|---|
+| **Krea 2 Turbo** | Fast image model - fp8 + int8 | 26.6 GB | 2 |
+| **Krea 2 RAW** | Photographic RAW model + turbo LoRA | 13.6 GB | 2 |
+| **Krea 2 LoRAs** | Krea 2 style LoRAs | ~4 GB | 0 |
+
+**FLUX.2 Klein — image**
+
+| Pack | What it is | Size | Files |
+|---|---|---|---|
+| **FLUX.2 Klein 9B (fp8)** | Klein 9B image model, fp8 + base | ~20 GB | 2 |
+| **FLUX.2 Klein 9B (bf16)** | Full-precision Klein 9B | ~34 GB | 1 |
+| **FLUX.2 Klein extras** | BiRefNet, SeedVR2, VAE, ref-control, BFS head | 10.1 GB | 5 |
+
+**Wan 2.x — video**
+
+| Pack | What it is | Size | Files |
+|---|---|---|---|
+| **Wan 2.2 Text-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 |
+| **Wan 2.2 Image-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 |
+| **Wan Animate v2** | Animate 14B fp8 + YOLO/ViTPose detection | 18.6 GB | 3 |
+| **Mocha (preview)** | Wan2.1-based preview model | 14.3 GB | 1 |
+| **Wan LoRAs** | lightx2v 4-step, SVI, relight + private sliders | ~12 GB | 12 |
+<!-- studio-models:end -->
+
+Sizes marked `~` are estimates (the source repository is gated, so the exact
+size could not be measured). Several LTX-2.3 Creative Lab IC-LoRAs and the
+private Wan sliders are gated — set a **HuggingFace token** in Settings or they
+are skipped with `[SKIP] HF_TOKEN not set` in the download log.
+
+### Workflows
+
+Baked in and available in ComfyUI's **Workflows** panel:
+
+| Folder | Contents |
+|---|---|
+| `LTX-2.3/` | Official Lightricks LTX-2.3 example workflows |
+| `LTX-2.3-community/` | Comfy-Org LTX-2.3 templates (community LoRAs) |
+| `LTX-Video-other/` | Remaining ComfyUI-LTXVideo examples (LTX-2 and earlier) |
+| `WhatDreamsCost/` | LTX Director / FFLF workflows |
+| `Krea2/` | Comfy-Org Krea 2 templates |
+| `FLUX2-Klein/` | One-node FLUX.2 Klein pipeline + NKD Klein Tools + Comfy-Org templates |
+| `Wan2.2/` | Hearmeman Wan 2.2 workflows |
+| `Wan-Animate/` | Hearmeman Wan Animate + KJ WanAnimate examples |
+| `Wan-MoCha/` | KJ MoCha examples |
+
+Workflow templates refresh on every pod start, so new upstream templates appear
+without rebuilding the image (`AUTO_UPDATE_TEMPLATES=false` disables this).
+
+### Custom nodes
+
+ComfyUI-Manager, KJNodes, WanVideoWrapper, WanAnimatePreprocess, LTXVideo,
+WhatDreamsCost, one-node-flux-2-klein, NKD-Klein-Tools, VideoHelperSuite,
+Impact-Pack, controlnet_aux, Easy-Use, Florence2, segment-anything-2, RES4LYF,
+Frame-Interpolation, GIMM-VFI, Detail-Daemon, RMBG, Inpaint-CropAndStitch,
+UltimateSDUpscale, GGUF, DepthAnythingV3, DepthCrafter, Crystools, essentials,
+Custom-Scripts, rgthree, Logic, cg-use-everywhere, advanced-model-manager.
 
 ### Model catalog (`models.json`)
 
@@ -180,6 +281,83 @@ npm run dist       # build the Windows installer into release/
 `renderer/models.js` holds only the offline **fallback** catalog. The real model
 list comes from the Docker image — see [Model catalog](#model-catalog-modelsjson)
 above.
+
+---
+
+## Version history
+
+Every release is listed here, newest first. Installers for all versions are on
+the [releases page](https://github.com/BISAM20/comfyui-runpod-launcher/releases).
+
+### v1.3.1 — Fix silently-ignored model selections
+**Fixed**
+- The built-in fallback model list was shown for **any** image when its manifest
+  could not be read. Its `DOWNLOAD_*` flags belong to `comfyui-wan`; other images
+  ignore unknown flags, so a pod deployed and downloaded nothing with no error.
+  The fallback is now restricted to its own image, and other images show an
+  explicit error with no model rows instead of flags that would do nothing.
+- The model list no longer flashes the built-in list before the real catalog
+  loads.
+
+**Added**
+- A warning on the Deploy tab whenever a pod already exists: models are applied
+  **when a pod is created**, so ticking them cannot affect a running pod (RunPod
+  cannot change a running pod's environment, not even across Stop/Start).
+
+### v1.3.0 — See what's inside each model pack
+**Added**
+- Every model pack expands to list the exact models and LoRAs it downloads, so
+  `LTX-2.3 Official LoRAs` is no longer an opaque flag name.
+- Manifests gained an optional `items` array and an `approx` flag; estimated
+  sizes display as `≈`.
+
+**Changed**
+- Packs published by an image show readable names, real descriptions and
+  measured sizes instead of `LTX23 Loras — Declared by the image`.
+
+### v1.2.1 — Model list follows the Docker image
+**Fixed**
+- The model list only refreshed from a running pod, so switching images kept
+  showing the previous list. The catalog is now read from the image on Docker
+  Hub before any pod exists — from a `com.comfyui.models` label when present,
+  otherwise derived from the image's own `DOWNLOAD_*` environment variables.
+- A running pod is only used as a catalog source when its image matches the one
+  being deployed.
+- Model names derived from environment variables are formatted properly
+  (`LTX23 Dev FP8`, `WAN22 T2V`).
+
+**Changed**
+- Auto volume sizing assumes a conservative size for models with no published
+  size rather than under-provisioning the volume (shown as `≥`).
+
+### v1.2.0 — Cost meter, HuggingFace token, image-defined models
+**Added**
+- **Cost meter** — live account balance, hourly burn rate and estimated runtime
+  remaining, with low-balance warnings.
+- **HuggingFace token** — saved encrypted once in Settings and applied to every
+  deploy, for gated or private models.
+- **Model list from the Docker image** — the image publishes a `models.json`
+  catalog the app reads, so updating the image updates the list.
+- **Automatic volume sizing** — the volume disk is calculated from the selected
+  models plus 50 GB of headroom; typing a value switches to manual.
+
+### v1.1.0 — Availability, progress, and a kill switch
+**Added**
+- **Live GPU availability** — only available GPUs are listed, with High /
+  Medium / Low badges; RTX PRO 6000, A40 and RTX PRO 4500 pin to the top.
+- **Progress / Logs panel** — per-pod status timeline, ComfyUI-readiness probe
+  and streaming container logs.
+- **Logs tab** — every RunPod request and error, with secrets redacted.
+- **Kill switch** — optionally stop or terminate running pods when the app
+  closes (off by default).
+
+**Fixed**
+- Container-disk guardrails that prevent the common *"machine does not have the
+  resources"* placement failure.
+
+### v1.0.0 — First release
+- Deploy a ComfyUI pod on RunPod: API key setup, GPU picker with live pricing,
+  model pre-download selection, and Stop / Start / Terminate pod management.
 
 ---
 
