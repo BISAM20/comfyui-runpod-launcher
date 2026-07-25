@@ -1,14 +1,18 @@
 // =============================================================================
 // FALLBACK model catalog.
 //
-// The real list is published by the Docker image itself (models.json, served by
-// a running pod on port 8189, or fetched from the manifest URL in Settings).
-// This copy is only used when no manifest can be reached, so the app still
-// works offline / before the first pod exists.
+// The real list is published by the Docker image itself (a com.comfyui.models
+// label, the image's DOWNLOAD_* env vars, or models.json served by a running
+// pod). This copy is only used when none of those can be reached.
 //
-// Each entry maps a UI row to the DOWNLOAD_* env flag the image's start.sh
-// understands. `gb` is the approximate size added to the /workspace volume.
+// IMPORTANT: these flags are specific to the image named below. A DOWNLOAD_*
+// flag that the target image does not declare is silently ignored by its
+// start.sh — the pod deploys and simply downloads nothing. So this list must
+// only ever be used for that image; see loadModelCatalog() in app.js.
 // =============================================================================
+
+// Repository this fallback list is valid for (tag ignored).
+window.MODEL_CATALOG_FALLBACK_IMAGE = 'bishoy22/comfyui-wan';
 
 window.MODEL_CATALOG_FALLBACK = [
   {

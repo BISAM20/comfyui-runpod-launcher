@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.3.0-6d5efc)
+![Version](https://img.shields.io/badge/version-1.3.1-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -117,7 +117,14 @@ resolved in this order, all before any pod exists:
    sizes shown as unknown.
 3. **A running pod** on the same image, which serves `models.json` on port 8189.
 
-If none are reachable, the app falls back to a built-in list.
+If none are reachable, the app falls back to a small built-in list — but **only
+for the image that list was written for**. For any other image it shows an error
+instead of guessing, because a `DOWNLOAD_*` flag an image does not declare is
+silently ignored by its `start.sh`: the pod would deploy and download nothing.
+
+> **Models are applied when a pod is created.** RunPod cannot change a running
+> pod's environment, so ticking models has no effect on an existing pod — not
+> even across Stop/Start. Deploy a new pod to add models.
 
 ```json
 {

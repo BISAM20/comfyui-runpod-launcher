@@ -680,6 +680,18 @@ select:focus {
   border: 1px solid rgba(239, 75, 108, 0.3);
 }
 
+/* Inline warning inside a field (e.g. "models apply to new pods only") */
+.notice {
+  background: rgba(242, 181, 68, 0.1);
+  border: 1px solid rgba(242, 181, 68, 0.28);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 8px 0 10px;
+}
+
 /* ---------- Pods list ---------- */
 .pods-list {
   display: flex;

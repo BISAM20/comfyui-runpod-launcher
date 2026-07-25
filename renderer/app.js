@@ -65,8 +65,9 @@ function confirmModal(title, body, confirmLabel, onConfirm) {
 // -----------------------------------------------------------------------------
 async function boot() {
   wireEvents();
-  // Show the bundled list immediately, then replace it with the image manifest.
-  window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
+  // Start empty — the catalog is resolved per image by loadModelCatalog(). We
+  // must not show flags before knowing which image they belong to.
+  window.MODEL_CATALOG = [];
   renderModelList();
   window.api.onLog(appendLiveLog); // stream logs into the Logs panel
 
@@ -106,6 +107,7 @@ async function afterLogin() {
   loadGpus();
   loadModelCatalog();
   loadBalance();
+  loadPods(); // populates the "models apply to new pods only" notice
   refreshHfStatus();
   updateSummary();
 
@@ -133,6 +135,18 @@ async function refreshHfStatus() {
       : 'No saved token. Add one here or in Settings for gated models.';
     hint.style.color = saved ? 'var(--green)' : 'var(--muted)';
   }
+}
+
+// Model selection is baked into a pod at creation time — RunPod cannot change a
+// pod's env afterwards. Warn while any pod exists so ticking boxes expecting an
+// existing pod to pick them up is not a silent no-op.
+function updateRunningPodNotice() {
+  const el = $('#runningPodNotice');
+  if (!el) return;
+  const active = state.pods.some((p) =>
+    ['RUNNING', 'EXITED', 'STOPPED'].includes((p.desiredStatus || '').toUpperCase())
+  );
+  el.style.display = active ? '' : 'none';
 }
 
 // Reflect the kill-switch setting in the hint + the sidebar "armed" badge.
@@ -311,10 +325,25 @@ async function loadModelCatalog() {
       (unknown ? ` — ${unknown} without a published size` : '');
     note.style.color = 'var(--green)';
   } else {
-    window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
-    note.textContent =
-      'Using the built-in list — could not read the model list from this image.';
-    note.style.color = 'var(--amber)';
+    // The built-in list is only valid for the image it was written for. Showing
+    // it for a different image would offer DOWNLOAD_* flags that image ignores:
+    // the pod would deploy and download nothing, with no error anywhere.
+    const repo = image.split(':')[0];
+    if (!image || repo === window.MODEL_CATALOG_FALLBACK_IMAGE) {
+      window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
+      note.textContent =
+        'Using the built-in list — could not read the model list from this image.';
+      note.style.color = 'var(--amber)';
+    } else {
+      window.MODEL_CATALOG = [];
+      note.innerHTML =
+        '⚠ Could not read the model list from <b>' +
+        escapeHtml(image) +
+        '</b>. Its models are not shown rather than guessed, because the wrong ' +
+        'flags would deploy a pod that downloads nothing. Check the image name, ' +
+        'or set a manifest URL in Settings, then use ↻ Reload list.';
+      note.style.color = 'var(--danger)';
+    }
   }
   state.catalogImage = image;
   renderModelList();
@@ -505,6 +534,7 @@ async function loadPods() {
   }
   state.pods = res.data;
   renderPods();
+  updateRunningPodNotice();
   scheduleRefresh();
 }
 
