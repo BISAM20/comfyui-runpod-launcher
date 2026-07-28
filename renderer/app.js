@@ -7,7 +7,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 // Spare space added on top of the selected models when auto-sizing the volume
 // (room for generated outputs, ComfyUI cache, and model variance).
-const VOLUME_HEADROOM_GB = 50;
+const VOLUME_HEADROOM_GB = 200;
 
 // Assumed size for a model whose image publishes no size, so auto-sizing stays
 // on the safe side rather than under-provisioning the volume.
