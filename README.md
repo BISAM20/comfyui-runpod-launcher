@@ -16,6 +16,7 @@ the pod. All from one window.
 **[Features](#features)** · **[Getting started](#getting-started)** ·
 **[Images](#the-docker-images-it-deploys)** ·
 **[Studio models & workflows](#comfyui-studio--models--workflows)** ·
+**[Model catalog](#model-catalog-modelsjson)** ·
 **[Build from source](#build-from-source)** ·
 **[Version history](#version-history)**
 
@@ -40,13 +41,30 @@ click **More info → Run anyway**.
 ### Deploy — live GPU pricing & availability
 ![Deploy tab](assets/screenshots/01-deploy.png)
 
-### My Pods — status, links, and controls
+### Model packs — see what's inside, volume sized for you
+![Model packs](assets/screenshots/05-models.png)
+
+Every pack expands to the exact files it downloads. The volume disk is sized from
+what you tick (plus 200 GB of headroom), and a notice reminds you that models are
+applied when a pod is **created** — ticking them cannot change a pod that is
+already running.
+
+### Newest models — LTX-2.5, MiniMax-H3 and tools
+![Newest model packs](assets/screenshots/07-new-models.png)
+
+### My Pods — live status, progress and container logs
 ![My Pods tab](assets/screenshots/02-pods.png)
+
+### Cost meter — warns before you run out of credit
+![Cost meter in its low-balance state](assets/screenshots/06-low-balance.png)
+
+Balance, hourly burn rate and runtime left sit in the sidebar. It turns amber and
+then red, and says how long you have left at the current rate.
 
 ### Logs — every request, with secrets redacted
 ![Logs tab](assets/screenshots/03-logs.png)
 
-### Settings — kill switch and defaults
+### Settings — manifest URL, HuggingFace token and kill switch
 ![Settings tab](assets/screenshots/04-settings.png)
 
 ---
@@ -104,7 +122,7 @@ maintained for this launcher — set one in **Settings → Docker image**:
 
 | Image | Focus |
 |---|---|
-| `bishoy22/comfyui-studio:latest` | LTX-2.3 · Krea 2 · FLUX.2 Klein · Wan 2.x |
+| `bishoy22/comfyui-studio:latest` | LTX-2.5 · MiniMax-H3 · LTX-2.3 · Krea 2 · FLUX.2 Klein · Wan 2.x |
 | `bishoy22/comfyui-wan:latest` | Wan 2.1 / 2.2 video + LTX-2.3 |
 
 Both are self-contained (ComfyUI installed directly on a CUDA base, launched by
@@ -124,63 +142,149 @@ Stop/Start.
 
 ## `comfyui-studio` — models & workflows
 
-Nothing is baked into the image except ComfyUI, the nodes and the workflows —
-models download only when you tick them. **~421 GB if you selected everything**,
-so pick per project; the app sizes the volume for you.
+The image ships ComfyUI, the custom nodes and the workflows. **Models are not baked in** — they download only when you tick them, so a pod starts lean. All 28 packs together are **~635 GB**; pick per project and the app sizes the volume for you.
+
+> **New in the image:** **LTX-2.5** (bf16, int8 and IC-LoRAs), **MiniMax-H3** (video + audio, reference-to-video, ControlNet Union), **MoGe-2** and **SAM3.1**. The LTX-2.3 Official LoRAs pack grew to 22 files (CrossView-Warp added) and Wan LoRAs is now 7 public files.
+
+![The newest model packs in the launcher](assets/screenshots/07-new-models.png)
+
+*The newest packs in the app — LTX-2.5, MiniMax-H3, MoGe-2 and SAM3.1, with the LTX-2.5 IC-LoRAs expanded to show every file.*
 
 ### Models
 
-<!-- studio-models:start -->
+**LTX-2.5 — video  ·  new**
+
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **LTX-2.5 (22B, bf16)** | Distilled transformer + Gemma4-12B encoder + VAEs + upscalers + distill LoRA. Gated — needs HF token. | ~92 GB | 9 | 8 of 9 files |
+| **LTX-2.5 — int8 (low VRAM)** | int8-convrot transformer + encoder instead of bf16 (37 GB vs 68 GB). Gated. | ~37 GB | 2 | required |
+| **LTX-2.5 IC-LoRAs** | Ingredients, clean plate, upscaler, water sim, colorize, deblur, day-to-night, cinemagraph, slow motion. Most gated. | ~12 GB | 10 | 9 of 10 files |
+
+**MiniMax-H3 — video + audio  ·  new**
+
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **MiniMax-H3 (video + audio)** | T2V / I2V — pruned int8 transformer, Qwen3-VL-32B encoder, both VAEs, turbo LoRA | ~44.5 GB | 5 | — |
+| **MiniMax-H3 — Reference-to-Video** | ref2va transformer + 4-step turbo LoRA (needs the base entry above) | ~23 GB | 2 | — |
+| **MiniMax-H3 ControlNet Union** | alibaba-pai Fun Controlnet Union — pose/depth/canny control for H3 | 6.8 GB | 1 | — |
+
 **LTX-2.3 — video**
 
-| Pack | What it is | Size | Files |
-|---|---|---|---|
-| **LTX-2.3 Dev (22B)** | Full-precision base video model | 46.1 GB | 1 |
-| **LTX-2.3 Dev FP8** | Quantised base model - less VRAM | 29.1 GB | 1 |
-| **LTX-2.3 Distilled** | Faster few-step base model | 46.1 GB | 1 |
-| **LTX-2.3 Distilled FP8** | Quantised distilled model | 29.5 GB | 1 |
-| **LTX-2.3 Upscalers** | Spatial x1.5/x2 and temporal x2 upscalers | 3.3 GB | 4 |
-| **LTX-2.3 Distill LoRA** | Few-step distill LoRAs for the base model | 15.2 GB | 2 |
-| **LTX-2.3 Kijai pack** | Kijai fp8 transformers, VAEs, text projection | ~22 GB | 1 |
-| **LTX-2.3 Official LoRAs** | Lightricks IC/ID LoRAs - control, upscale, lipdub, HDR | ~14 GB | 21 |
-| **LTX-2.3 Community LoRAs** | Community styles + Gemma abliterated encoders | 5.3 GB | 7 |
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **LTX-2.3 Dev (22B)** | Full-precision base video model | 46.1 GB | 1 | — |
+| **LTX-2.3 Dev FP8** | Quantised base model — less VRAM | 29.1 GB | 1 | — |
+| **LTX-2.3 Distilled** | Faster few-step base model | 46.1 GB | 1 | — |
+| **LTX-2.3 Distilled FP8** | Quantised distilled model | 29.5 GB | 1 | — |
+| **LTX-2.3 Upscalers** | Spatial x1.5/x2 and temporal x2 upscalers | 3.3 GB | 4 | — |
+| **LTX-2.3 Distill LoRA** | Few-step distill LoRAs for the base model | 15.2 GB | 2 | — |
+| **LTX-2.3 Kijai pack** | Kijai fp8 transformers, VAEs, text projection | ~22 GB | 9 | — |
+| **LTX-2.3 Official LoRAs** | Lightricks IC/ID LoRAs — control, upscale, lipdub, HDR + CrossView-Warp | ~14.2 GB | 22 | 16 of 22 files |
+| **LTX-2.3 Community LoRAs** | Community styles + Gemma abliterated encoders | 5.3 GB | 7 | — |
 
 **Krea 2 — image**
 
-| Pack | What it is | Size | Files |
-|---|---|---|---|
-| **Krea 2 Turbo** | Fast image model - fp8 + int8 | 26.6 GB | 2 |
-| **Krea 2 RAW** | Photographic RAW model + turbo LoRA | 13.6 GB | 2 |
-| **Krea 2 LoRAs** | Krea 2 style LoRAs | ~4 GB | 0 |
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **Krea 2 Turbo** | Fast image model — fp8 + int8 | 26.6 GB | 2 | — |
+| **Krea 2 RAW** | Photographic RAW model + turbo LoRA | 13.6 GB | 2 | — |
+| **Krea 2 LoRAs** | Style LoRAs (darkbrush, neon drip, retro anime, watercolor, vintage tarot ...) + Turbo LoRA | ~4 GB | 11 | — |
 
 **FLUX.2 Klein — image**
 
-| Pack | What it is | Size | Files |
-|---|---|---|---|
-| **FLUX.2 Klein 9B (fp8)** | Klein 9B image model, fp8 + base | ~20 GB | 2 |
-| **FLUX.2 Klein 9B (bf16)** | Full-precision Klein 9B | ~34 GB | 1 |
-| **FLUX.2 Klein extras** | BiRefNet, SeedVR2, VAE, ref-control, BFS head | 10.1 GB | 5 |
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **FLUX.2 Klein 9B (fp8)** | Klein 9B image model, fp8 + base. Gated — needs HF token + accepted licence. | ~20 GB | 2 | required |
+| **FLUX.2 Klein 9B (bf16)** | Full-precision Klein 9B. Gated — needs HF token + accepted licence. | ~34 GB | 1 | required |
+| **FLUX.2 Klein extras** | BiRefNet, SeedVR2, VAE, ref-control, BFS head | 10.1 GB | 5 | — |
 
 **Wan 2.x — video**
 
-| Pack | What it is | Size | Files |
-|---|---|---|---|
-| **Wan 2.2 Text-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 |
-| **Wan 2.2 Image-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 |
-| **Wan Animate v2** | Animate 14B fp8 + YOLO/ViTPose detection | 18.6 GB | 3 |
-| **Mocha (preview)** | Wan2.1-based preview model | 14.3 GB | 1 |
-| **Wan LoRAs** | lightx2v 4-step, SVI, relight + private sliders | ~12 GB | 12 |
-<!-- studio-models:end -->
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **Wan 2.2 Text-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 | — |
+| **Wan 2.2 Image-to-Video** | High + low noise fp8 (14B) | 28.6 GB | 2 | — |
+| **Wan Animate v2** | Animate 14B fp8 + YOLO/ViTPose detection | 18.6 GB | 3 | — |
+| **Mocha (preview)** | Wan2.1-based preview model | 14.3 GB | 1 | — |
+| **Wan LoRAs** | lightx2v 4-step, SVI, relight | ~7 GB | 7 | — |
 
-Sizes marked `~` are estimates (the source repository is gated, so the exact
-size could not be measured). Several LTX-2.3 Creative Lab IC-LoRAs and the
-private Wan sliders are gated — set a **HuggingFace token** in Settings or they
-are skipped with `[SKIP] HF_TOKEN not set` in the download log.
+**Tools — geometry & segmentation  ·  new**
+
+| Pack | What it is | Size | Files | HF token |
+|---|---|---|---|---|
+| **MoGe-2 (geometry)** | Monocular depth / normals / 3D — used by ComfyUI-MoGe2 | 1.4 GB | 1 | — |
+| **SAM3.1 (segment + track)** | sam3.1_multiplex_fp16 — for the built-in SAM3_VideoTrack nodes (ComfyUI 0.33+) | 1.8 GB | 1 | — |
+
+Sizes marked `~` are estimates — the source repository is gated or the size could not be measured. The **HF token** column shows packs that download from gated HuggingFace repositories: accept each repository's licence with your HuggingFace account and set the token once in **Settings**. Files you don't have access to are skipped and logged as `[SKIP] HF_TOKEN not set`; every other pack downloads without a token.
 
 #### Every file, pack by pack
 
-<!-- studio-files:start -->
-Every file each pack downloads, by name.
+Each pack expands to the exact files it downloads — 117 files in total.
+
+<details>
+<summary><b>LTX-2.5 (22B, bf16)</b> — Distilled transformer + Gemma4-12B encoder + VAEs + upscalers + distill LoRA. Gated — needs HF token. · ~92 GB · 9 files</summary>
+
+- `ltx-2.5-22b-distilled-transformer-bf16`
+- `gemma4-12b-with-proj-ltx-2.5-bf16`
+- `gemma4_e2b_it_bf16`
+- `ltx-2.5-video-vae-bf16`
+- `ltx-2.5-audio-vae-bf16`
+- `ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0`
+- `ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0`
+- `ltx-2.5-duration-head-bf16`
+- `ltx-2.5-22b-distilled-lora-450-bf16`
+
+</details>
+
+<details>
+<summary><b>LTX-2.5 — int8 (low VRAM)</b> — int8-convrot transformer + encoder instead of bf16 (37 GB vs 68 GB). Gated. · ~37 GB · 2 files</summary>
+
+- `ltx-2.5-22b-distilled-transformer-comfy-int8-convrot`
+- `gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot`
+
+</details>
+
+<details>
+<summary><b>LTX-2.5 IC-LoRAs</b> — Ingredients, clean plate, upscaler, water sim, colorize, deblur, day-to-night, cinemagraph, slow motion. Most gated. · ~12 GB · 10 files</summary>
+
+- `ltx-2.5-22b-lora-slow-motion-control-1.0`
+- `ltx-2.5-22b-ic-lora-ingredients-0.9`
+- `ltx-2.5-22b-ic-lora-clean-plate-1.0`
+- `ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0`
+- `ltx-2.5-22b-ic-lora-water-simulation-0.9`
+- `ltx-2.5-22b-ic-lora-decompression-0.9`
+- `ltx-2.5-22b-ic-lora-colorization-0.9`
+- `ltx-2.5-22b-ic-lora-deblur-0.9`
+- `ltx-2.5-22b-ic-lora-day-to-night-0.9`
+- `ltx-2.5-22b-lora-cinemagraph-0.9`
+
+</details>
+
+<details>
+<summary><b>MiniMax-H3 (video + audio)</b> — T2V / I2V — pruned int8 transformer, Qwen3-VL-32B encoder, both VAEs, turbo LoRA · ~44.5 GB · 5 files</summary>
+
+- `minimax_h3_fl2va_pruned_int8_convrot`
+- `qwen3vl_32b_minimax_h3_nvfp4_awq`
+- `minimax_h3_video_vae_fp16`
+- `minimax_h3_audio_vae_fp32`
+- `minimax_h3_fl2v_turbo_8step_v1.0`
+
+</details>
+
+<details>
+<summary><b>MiniMax-H3 — Reference-to-Video</b> — ref2va transformer + 4-step turbo LoRA (needs the base entry above) · ~23 GB · 2 files</summary>
+
+- `minimax_h3_ref2va_pruned_int8_convrot`
+- `minimax_h3_ref2v_turbo_4step_v0.1`
+
+</details>
+
+<details>
+<summary><b>MiniMax-H3 ControlNet Union</b> — alibaba-pai Fun Controlnet Union — pose/depth/canny control for H3 · 6.8 GB · 1 files</summary>
+
+- `MiniMax-H3-Fun-Controlnet-Union`
+
+</details>
 
 <details>
 <summary><b>LTX-2.3 Dev (22B)</b> — Full-precision base video model · 46.1 GB · 1 files</summary>
@@ -190,7 +294,7 @@ Every file each pack downloads, by name.
 </details>
 
 <details>
-<summary><b>LTX-2.3 Dev FP8</b> — Quantised base model - less VRAM · 29.1 GB · 1 files</summary>
+<summary><b>LTX-2.3 Dev FP8</b> — Quantised base model — less VRAM · 29.1 GB · 1 files</summary>
 
 - `ltx-2.3-22b-dev-fp8`
 
@@ -229,15 +333,24 @@ Every file each pack downloads, by name.
 </details>
 
 <details>
-<summary><b>LTX-2.3 Kijai pack</b> — Kijai fp8 transformers, VAEs, text projection · ~22 GB · 1 files</summary>
+<summary><b>LTX-2.3 Kijai pack</b> — Kijai fp8 transformers, VAEs, text projection · ~22 GB · 9 files</summary>
 
-- `main`
+- `ltx-2.3-22b-dev_transformer_only_fp8_scaled`
+- `ltx-2.3-22b-distilled_transformer_only_fp8_input_scaled_v3`
+- `ltx-2.3_text_projection_bf16`
+- `LTX23_video_vae_bf16`
+- `LTX23_audio_vae_bf16`
+- `taeltx2_3`
+- `ltx-2.3-22b-distilled-1.1_lora-dynamic_fro09_avg_rank_111_bf16`
+- `ltx-2.3-22b-distilled-lora-dynamic_fro09_avg_rank_105_bf16`
+- `LTX-2.3-OmniNFT-RL-Lora_bf16`
 
 </details>
 
 <details>
-<summary><b>LTX-2.3 Official LoRAs</b> — Lightricks IC/ID LoRAs - control, upscale, lipdub, HDR · ~14 GB · 21 files</summary>
+<summary><b>LTX-2.3 Official LoRAs</b> — Lightricks IC/ID LoRAs — control, upscale, lipdub, HDR + CrossView-Warp · ~14.2 GB · 22 files</summary>
 
+- `LTX2.3-22B_IC-LoRA-CrossView-Warp_v0.9_18000`
 - `ltx-2.3-22b-ic-lora-union-control-ref0.5`
 - `ltx-2.3-22b-ic-lora-motion-track-control-ref0.5`
 - `ltx-2.3-22b-ic-lora-ingredients-0.9`
@@ -276,7 +389,7 @@ Every file each pack downloads, by name.
 </details>
 
 <details>
-<summary><b>Krea 2 Turbo</b> — Fast image model - fp8 + int8 · 26.6 GB · 2 files</summary>
+<summary><b>Krea 2 Turbo</b> — Fast image model — fp8 + int8 · 26.6 GB · 2 files</summary>
 
 - `krea2_turbo_fp8_scaled`
 - `krea2_turbo_int8_convrot`
@@ -291,10 +404,25 @@ Every file each pack downloads, by name.
 
 </details>
 
-**Krea 2 LoRAs** — Krea 2 style LoRAs (file list not published)
+<details>
+<summary><b>Krea 2 LoRAs</b> — Style LoRAs (darkbrush, neon drip, retro anime, watercolor, vintage tarot ...) + Turbo LoRA · ~4 GB · 11 files</summary>
+
+- `krea2_style_reference`
+- `krea2_darkbrush`
+- `krea2_dotmatrix`
+- `krea2_kidsdrawing`
+- `krea2_neondrip`
+- `krea2_rainywindow`
+- `krea2_retroanime`
+- `krea2_softwatercolor`
+- `krea2_sunsetblur`
+- `krea2_vintagetarot`
+- `krea2_turbo_lora_rank_64_bf16`
+
+</details>
 
 <details>
-<summary><b>FLUX.2 Klein 9B (fp8)</b> — Klein 9B image model, fp8 + base · ~20 GB · 2 files</summary>
+<summary><b>FLUX.2 Klein 9B (fp8)</b> — Klein 9B image model, fp8 + base. Gated — needs HF token + accepted licence. · ~20 GB · 2 files</summary>
 
 - `flux-2-klein-9b-fp8`
 - `flux-2-klein-base-9b-fp8`
@@ -302,7 +430,7 @@ Every file each pack downloads, by name.
 </details>
 
 <details>
-<summary><b>FLUX.2 Klein 9B (bf16)</b> — Full-precision Klein 9B · ~34 GB · 1 files</summary>
+<summary><b>FLUX.2 Klein 9B (bf16)</b> — Full-precision Klein 9B. Gated — needs HF token + accepted licence. · ~34 GB · 1 files</summary>
 
 - `flux-2-klein-9b`
 
@@ -352,7 +480,7 @@ Every file each pack downloads, by name.
 </details>
 
 <details>
-<summary><b>Wan LoRAs</b> — lightx2v 4-step, SVI, relight + private sliders · ~12 GB · 12 files</summary>
+<summary><b>Wan LoRAs</b> — lightx2v 4-step, SVI, relight · ~7 GB · 7 files</summary>
 
 - `wan2.2_animate_14B_relight_lora_bf16`
 - `high_noise_model`
@@ -361,34 +489,65 @@ Every file each pack downloads, by name.
 - `wan2.2_i2v_A14b_low_noise_lora_rank64_lightx2v_4step_1022`
 - `SVI_v2_PRO_Wan2.2-I2V-A14B_HIGH_lora_rank_128_fp16`
 - `SVI_v2_PRO_Wan2.2-I2V-A14B_LOW_lora_rank_128_fp16`
-- `Bishoy_wan2.1_t2v`
-- `Gender_sleder_2`
-- `concept_slider_wan2.1_age`
-- `crowds_slider`
-- `weight_slider_wan2.1_T2V`
 
 </details>
-<!-- studio-files:end -->
+
+<details>
+<summary><b>MoGe-2 (geometry)</b> — Monocular depth / normals / 3D — used by ComfyUI-MoGe2 · 1.4 GB · 1 files</summary>
+
+- `moge-2-vitl-normal`
+
+</details>
+
+<details>
+<summary><b>SAM3.1 (segment + track)</b> — sam3.1_multiplex_fp16 — for the built-in SAM3_VideoTrack nodes (ComfyUI 0.33+) · 1.8 GB · 1 files</summary>
+
+- `sam3.1_multiplex_fp16`
+
+</details>
 
 ### Workflows
 
-Baked in and available in ComfyUI's **Workflows** panel:
+79 workflows across 12 folders are baked into ComfyUI's **Workflows** panel. They are listed as published upstream today, and are refreshed on every pod start (`AUTO_UPDATE_TEMPLATES=false` disables that), so new upstream workflows appear without rebuilding the image.
 
-| Folder | Contents |
-|---|---|
-| `LTX-2.3/` | Official Lightricks LTX-2.3 example workflows |
-| `LTX-2.3-community/` | Comfy-Org LTX-2.3 templates (community LoRAs) |
-| `LTX-Video-other/` | Remaining ComfyUI-LTXVideo examples (LTX-2 and earlier) |
-| `WhatDreamsCost/` | LTX Director / FFLF workflows |
-| `Krea2/` | Comfy-Org Krea 2 templates |
-| `FLUX2-Klein/` | One-node FLUX.2 Klein pipeline + NKD Klein Tools + Comfy-Org templates |
-| `Wan2.2/` | Hearmeman Wan 2.2 workflows |
-| `Wan-Animate/` | Hearmeman Wan Animate + KJ WanAnimate examples |
-| `Wan-MoCha/` | KJ MoCha examples |
+<details>
+<summary><b>LTX-2.5/</b> — official Lightricks examples · new · 12 workflows</summary>
 
-<!-- studio-workflows:start -->
-Every workflow baked into the image, by name. They appear in ComfyUI's
-**Workflows** panel under these folders.
+- `LTX-2.5_T2V_I2V_Single_Stage_Distilled` — text/image → video, one stage
+- `LTX-2.5_T2V_I2V_Two_Stage_Distilled` — text/image → video, two stage
+- `LTX-2.5_A2V_Two_Stage_Distilled` — audio → video
+- `LTX-2.5_T2A_Single_Stage_Distilled` — text → audio
+- `LTX-2.5_V2V_ICLoRA_Single_Stage_Distilled` — video → video
+- `LTX-2.5_V2V_TiledFusion_Upscale` — tiled video upscale
+- `LTX-2.5_V2V_TiledFusion_Native_4K_8K` — tiled native 4K / 8K
+- `LTX-2.5_ICLoRA_Union_Control_Distilled` — union control
+- `LTX-2.5_ICLoRA_Motion_Track_Distilled` — motion tracking
+- `LTX-2.5_ICLoRA_Ingredients_Single_Stage_Distilled` — ingredients / reference
+- `LTX-2.5_ICLoRA_Inpaint_Two_Stage_Distilled` — inpainting
+- `LTX-2.5_ICLoRA_Outpaint_Two_Stage_Distilled` — outpainting
+
+</details>
+
+<details>
+<summary><b>LTX-2.5-community/</b> — Comfy-Org templates · new · 3 workflows</summary>
+
+- `video_ltx2_5_t2v` — text → video
+- `video_ltx2_5_i2v` — image → video
+- `video_ltx2_5_flf2v` — first + last frame → video
+
+</details>
+
+<details>
+<summary><b>MiniMax-H3/</b> — Comfy-Org templates · new · 6 workflows</summary>
+
+- `video_minimax_h3_t2v` — text → video
+- `video_minimax_h3_i2v` — image → video
+- `video_minimax_h3_i2v_continuation` — image → video, continuation
+- `video_minimax_h3_r2v` — reference → video
+- `video_minimax_h3_multiframe_reference` — multi-frame reference
+- `video_minimax_h3_fun_controlnet_union` — ControlNet Union (pose / depth / canny)
+
+</details>
 
 <details>
 <summary><b>LTX-2.3/</b> — official Lightricks examples · 12 workflows</summary>
@@ -402,7 +561,7 @@ Every workflow baked into the image, by name. They appear in ComfyUI's
 - `LTX-2.3_ICLoRA_Ingredients_Single_Stage_Distilled` — ingredients / reference
 - `LTX-2.3_ICLoRA_Inpaint_Two_Stage_Distilled` — inpainting
 - `LTX-2.3_ICLoRA_Outpaint_Two_Stage_Distilled` — outpainting
-- `LTX-2.3_ICLoRA_Lipdub_Two_Stage_Distilled` — lip sync / dubbing
+- `LTX-2.3_ICLoRA_DubIt_Two_Stage_Distilled` — DubIt, two stage
 - `LTX-2.3_ICLoRA_HDR_Distilled` — HDR
 - `LTX-2.3_ICLoRA_Pixel_Spatial_Upscaler_Distilled` — pixel spatial upscale
 
@@ -423,9 +582,10 @@ Every workflow baked into the image, by name. They appear in ComfyUI's
 </details>
 
 <details>
-<summary><b>WhatDreamsCost/</b> — LTX Director / first-last-frame · 4 workflows</summary>
+<summary><b>WhatDreamsCost/</b> — LTX Director / first-last-frame · 5 workflows</summary>
 
-- `LTX_Director_2_Workflow_Hotfix`
+- `LTX_Director_2_Workflow_Distilled`
+- `LTX_Director_2_Workflow_GGUF`
 - `LTX I2V First Last Frame 2 Stage Workflow v6`
 - `LTX I2V First Last Frame 3 Stage Workflow v6`
 - `LTX I2V FFLF Custom Audio Workflow - SUPPORTS LATEST COMFYUI VERSION - V3`
@@ -444,27 +604,22 @@ Every workflow baked into the image, by name. They appear in ComfyUI's
 <details>
 <summary><b>FLUX2-Klein/</b> — one-node pipeline, NKD tools, Comfy-Org · 16 workflows</summary>
 
-One-node FLUX.2 Klein pipeline:
-- `t2i_workflow` — text → image
-- `i2i_workflow` — image → image
-- `edit_workflow` — instruction edit
-- `inpaint_workflow` — inpainting
-- `outpaint_workflow` — outpainting
-- `faceswap_workflow` — face swap
-- `pose_workflow` — pose control
-- `remove_bg_workflow` — background removal
-- `upscale_workflow` — upscale
-
-NKD Klein Tools:
-- `NKD Klein Tools`
-
-Comfy-Org templates:
-- `image_flux2_klein_text_to_image`
-- `image_flux2_klein_9b_kv_image_edit`
-- `image_flux2_klein_image_edit_9b_base`
-- `image_flux2_klein_image_edit_9b_distilled`
-- `image_flux2_klein_image_edit_4b_base`
-- `image_flux2_klein_image_edit_4b_distilled`
+- `t2i_workflow` — one-node · text → image
+- `i2i_workflow` — one-node · image → image
+- `edit_workflow` — one-node · instruction edit
+- `inpaint_workflow` — one-node · inpainting
+- `outpaint_workflow` — one-node · outpainting
+- `faceswap_workflow` — one-node · face swap
+- `pose_workflow` — one-node · pose control
+- `remove_bg_workflow` — one-node · background removal
+- `upscale_workflow` — one-node · upscale
+- `NKD Klein Tools` — NKD Klein Tools
+- `image_flux2_klein_text_to_image` — Comfy-Org · text → image
+- `image_flux2_klein_9b_kv_image_edit` — Comfy-Org · 9B KV image edit
+- `image_flux2_klein_image_edit_9b_base` — Comfy-Org · 9B base edit
+- `image_flux2_klein_image_edit_9b_distilled` — Comfy-Org · 9B distilled edit
+- `image_flux2_klein_image_edit_4b_base` — Comfy-Org · 4B base edit
+- `image_flux2_klein_image_edit_4b_distilled` — Comfy-Org · 4B distilled edit
 
 </details>
 
@@ -473,9 +628,12 @@ Comfy-Org templates:
 
 - `Wan2.2_T2V` — text → video
 - `Wan2.2_I2V` — image → video
-- `Wan2.2_T2V_60FPS` / `Wan2.2_I2V_60FPS` — 60 fps
-- `Wan2.2_T2V_RES4LYF_Nodes` / `Wan2.2_I2V_RES4LYF_Nodes` — slower, better quality
-- `Wan2.2_5B_T2V_60FPS` / `Wan2.2_5B_I2V_60FPS` — faster, 5B model
+- `Wan2.2_T2V_60FPS` — 60 fps
+- `Wan2.2_I2V_60FPS` — 60 fps
+- `Wan2.2_T2V_RES4LYF_Nodes` — slower, better quality
+- `Wan2.2_I2V_RES4LYF_Nodes` — slower, better quality
+- `Wan2.2_5B_T2V_60FPS` — faster, 5B model
+- `Wan2.2_5B_I2V_60FPS` — faster, 5B model
 - `Wan2.2_Text-To-Image` — text → image
 
 </details>
@@ -491,34 +649,87 @@ Comfy-Org templates:
 </details>
 
 <details>
-<summary><b>Wan-MoCha/</b> — KJ wrapper · 1 workflow</summary>
+<summary><b>Wan-MoCha/</b> — KJ wrapper · 1 workflows</summary>
 
-- `wanvideo_2_1_14B_MoCha_replace_subject_KJ_02`
+- `wanvideo_2_1_14B_MoCha_replace_subject_KJ_02` — replace subject
 
 </details>
 
 <details>
 <summary><b>LTX-Video-other/</b> — earlier LTX-Video examples</summary>
 
-The remaining top-level examples from `ComfyUI-LTXVideo` (LTX-2 and earlier),
-kept for reference.
+The remaining top-level examples shipped with `ComfyUI-LTXVideo`, kept for reference. The versioned `2.3/` and `2.5/` sets above are the current ones.
 
 </details>
-<!-- studio-workflows:end -->
-
-Workflow templates refresh on every pod start, so new upstream templates appear
-without rebuilding the image (`AUTO_UPDATE_TEMPLATES=false` disables this).
 
 ### Custom nodes
 
-ComfyUI-Manager, KJNodes, WanVideoWrapper, WanAnimatePreprocess, LTXVideo,
-WhatDreamsCost, one-node-flux-2-klein, NKD-Klein-Tools, VideoHelperSuite,
-Impact-Pack, controlnet_aux, Easy-Use, Florence2, segment-anything-2, RES4LYF,
-Frame-Interpolation, GIMM-VFI, Detail-Daemon, RMBG, Inpaint-CropAndStitch,
-UltimateSDUpscale, GGUF, DepthAnythingV3, DepthCrafter, Crystools, essentials,
-Custom-Scripts, rgthree, Logic, cg-use-everywhere, advanced-model-manager.
+All 41 nodes installed in the image, each at its latest upstream commit when the image is built.
 
-### Model catalog (`models.json`)
+**Video & audio**
+
+| Node | Author | What it does |
+|---|---|---|
+| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | Lightricks | LTX-2.x video nodes |
+| [WhatDreamsCost-ComfyUI](https://github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI) | WhatDreamsCost | LTX Director and first/last-frame workflows |
+| [ComfyUI-CrossViewWarp](https://github.com/cseti007/ComfyUI-CrossViewWarp) | cseti007 | CrossView-Warp nodes |
+| [ComfyUI-WanVideoWrapper](https://github.com/kijai/ComfyUI-WanVideoWrapper) | kijai | Wan 2.x video wrapper |
+| [ComfyUI-WanAnimatePreprocess](https://github.com/kijai/ComfyUI-WanAnimatePreprocess) | kijai | Wan Animate preprocessing |
+| [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | Kosinkadink | Load, combine and preview video |
+| [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | Fannovel16 | Frame interpolation (RIFE / FILM) |
+| [ComfyUI-GIMM-VFI](https://github.com/kijai/ComfyUI-GIMM-VFI) | kijai | GIMM-VFI frame interpolation |
+| [MaskVidExperiments](https://github.com/drozbay/MaskVidExperiments) | drozbay | Video mask experiments |
+| [comfyui-hrnodes](https://github.com/hashu786/comfyui-hrnodes) | hashu786 | HR utility nodes |
+
+**Image**
+
+| Node | Author | What it does |
+|---|---|---|
+| [one-node-flux-2-klein](https://github.com/yanokusnir-ai/one-node-flux-2-klein) | yanokusnir-ai | One-node FLUX.2 Klein pipeline |
+| [ComfyUI-NKD-Klein-Tools](https://github.com/Nekodificador/ComfyUI-NKD-Klein-Tools) | Nekodificador | FLUX.2 Klein tools |
+| [ComfyUI-NKD-Basic-Tools](https://github.com/Nekodificador/ComfyUI-NKD-Basic-Tools) | Nekodificador | NKD basic tools |
+| [ComfyUI-NKD-Sigmas-Curve](https://github.com/Nekodificador/ComfyUI-NKD-Sigmas-Curve) | Nekodificador | Sigma curve editor |
+| [ComfyUI-NKD-Popup-Preview](https://github.com/Nekodificador/ComfyUI-NKD-Popup-Preview) | Nekodificador | Popup image preview |
+| [ComfyUI-RMBG](https://github.com/1038lab/ComfyUI-RMBG) | 1038lab | Background removal |
+| [ComfyUI-Inpaint-CropAndStitch](https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch) | lquesada | Inpaint crop and stitch |
+| [ComfyUI_UltimateSDUpscale](https://github.com/ssitu/ComfyUI_UltimateSDUpscale) | ssitu | Tiled Ultimate SD Upscale |
+| [ComfyUI-Detail-Daemon](https://github.com/Jonseed/ComfyUI-Detail-Daemon) | Jonseed | Detail enhancement |
+
+**Vision, depth & segmentation**
+
+| Node | Author | What it does |
+|---|---|---|
+| [ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2) | kijai | SAM 2 segmentation |
+| [ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2) | kijai | Florence-2 vision-language model |
+| [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux) | Fannovel16 | ControlNet preprocessors |
+| [ComfyUI-DepthAnythingV2](https://github.com/kijai/ComfyUI-DepthAnythingV2) | kijai | Depth Anything V2 |
+| [ComfyUI-DepthAnythingV3](https://github.com/PozzettiAndrea/ComfyUI-DepthAnythingV3) | PozzettiAndrea | Depth Anything V3 |
+| [ComfyUI-DepthCrafter-Nodes](https://github.com/akatz-ai/ComfyUI-DepthCrafter-Nodes) | akatz-ai | Consistent video depth |
+| [ComfyUI-MoGe2](https://github.com/zade23/ComfyUI-MoGe2) | zade23 | MoGe-2 geometry (depth / normals / 3D) |
+
+**Utilities & workflow**
+
+| Node | Author | What it does |
+|---|---|---|
+| [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager) | ltdrdata | Install nodes and models from the UI |
+| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | ltdrdata | Detection, segmentation and switch logic |
+| [was-node-suite-comfyui](https://github.com/ltdrdata/was-node-suite-comfyui) | ltdrdata | WAS node suite |
+| [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | kijai | Utility nodes (resize, constants, NAG) |
+| [ComfyUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use) | yolain | Simplified pipelines |
+| [ComfyUI_essentials](https://github.com/cubiq/ComfyUI_essentials) | cubiq | Core utility nodes |
+| [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | rgthree | Labels, bookmarks and display nodes |
+| [ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts) | pythongosssss | UI helpers, Get/Set nodes, autocomplete |
+| [ComfyUI-Logic](https://github.com/theUpsider/ComfyUI-Logic) | theUpsider | Conditional logic nodes |
+| [cg-use-everywhere](https://github.com/chrisgoringe/cg-use-everywhere) | chrisgoringe | Broadcast values across the graph |
+| [ComfyUI_Fill-Nodes](https://github.com/filliptm/ComfyUI_Fill-Nodes) | filliptm | Fill-Nodes utility set |
+| [ComfyUI-Crystools](https://github.com/crystian/ComfyUI-Crystools) | crystian | Resource monitor and metadata |
+| [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | city96 | GGUF quantised model loader |
+| [RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF) | ClownsharkBatwing | Advanced samplers and schedulers |
+| [ComfyUI-advanced-model-manager](https://github.com/BISAM20/ComfyUI-advanced-model-manager) | BISAM20 | Model manager |
+
+---
+
+## Model catalog (`models.json`)
 
 The list of downloadable models is defined by the **image**, not the app — point
 the app at a different image and the model list changes to match. The catalog is
