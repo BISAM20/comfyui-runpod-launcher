@@ -59,6 +59,12 @@ app.whenReady().then(async () => {
       nodeIntegration: false,
     },
   });
+  // Any renderer error means the UI is broken — never publish screenshots of it.
+  const rendererErrors = [];
+  win.webContents.on('console-message', (_e, level, message, line, source) => {
+    if (level >= 3) rendererErrors.push(`${message} (${path.basename(source || '?')}:${line})`);
+  });
+  win.webContents.on('render-process-gone', (_e, d) => rendererErrors.push('renderer crashed: ' + d.reason));
   await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   await wait(1400); // boot + loadGpus + manifest
 
@@ -176,5 +182,11 @@ app.whenReady().then(async () => {
     height: Math.ceil(r.height) + pad * 2,
   });
 
+  if (rendererErrors.length) {
+    console.log('RENDERER ERRORS:\n  ' + rendererErrors.join('\n  '));
+    process.exitCode = 1;
+  } else {
+    console.log('renderer: no errors');
+  }
   app.quit();
 });

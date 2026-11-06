@@ -8,6 +8,7 @@ const path = require('path');
 const runpod = require('./runpod');
 const store = require('./store');
 const log = require('./logger');
+const { createAutoOpener } = require('./autoopen');
 
 // The Docker image this launcher deploys. Change here if you rename the repo.
 const DEFAULT_IMAGE = 'bishoy22/comfyui-wan:latest';
@@ -106,6 +107,29 @@ function requireKey() {
   return key;
 }
 
+// -----------------------------------------------------------------------------
+// Auto-open: once a pod created/started from this app is ready, open ComfyUI in
+// the user's default browser. Setting `autoOpen`: 'off' | 'ready' | 'downloads'.
+// -----------------------------------------------------------------------------
+const AUTO_OPEN_MODES = ['off', 'ready', 'downloads'];
+
+const autoOpener = createAutoOpener({
+  getMode: () => {
+    const m = store.loadSettings().autoOpen;
+    return AUTO_OPEN_MODES.includes(m) ? m : 'ready'; // on by default
+  },
+  getPod: (id) => runpod.getPod(requireKey(), id),
+  probeComfy: (id) => runpod.probeComfy(id),
+  fetchPodLogs: (id) => runpod.fetchPodLogs(id),
+  open: (url) => shell.openExternal(url),
+  notify: (evt) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('pod:autoOpen', evt);
+    }
+  },
+  log,
+});
+
 // Wrap an async handler so errors come back as { ok, error } instead of crashing.
 function handle(channel, fn) {
   ipcMain.handle(channel, async (_evt, ...args) => {
@@ -145,7 +169,7 @@ handle('settings:clearApiKey', async () => {
 
 handle('settings:getDeployDefaults', async () => {
   const s = store.loadSettings();
-  return { image: DEFAULT_IMAGE, ...s };
+  return { image: DEFAULT_IMAGE, autoOpen: 'ready', ...s };
 });
 
 handle('settings:saveDeployDefaults', async (obj) => {
@@ -224,6 +248,13 @@ handle('settings:setOnClose', async (action) => {
   return s.onClose;
 });
 
+handle('settings:setAutoOpen', async (mode) => {
+  const s = store.loadSettings();
+  s.autoOpen = AUTO_OPEN_MODES.includes(mode) ? mode : 'ready';
+  store.saveSettings(s);
+  return s.autoOpen;
+});
+
 // -----------------------------------------------------------------------------
 // RunPod channels
 // -----------------------------------------------------------------------------
@@ -237,14 +268,26 @@ handle('runpod:createPod', async (opts) => {
     const hf = store.getHfToken();
     if (hf) merged.env = { ...(merged.env || {}), HF_TOKEN: hf };
   }
-  return runpod.createPod(requireKey(), merged);
+  const pod = await runpod.createPod(requireKey(), merged);
+  if (pod && pod.id) autoOpener.watch(pod.id); // open ComfyUI when it is ready
+  return pod;
 });
 
 handle('runpod:listPods', async () => runpod.listPods(requireKey()));
 handle('runpod:getPod', async (id) => runpod.getPod(requireKey(), id));
-handle('runpod:stopPod', async (id) => runpod.stopPod(requireKey(), id));
-handle('runpod:startPod', async (id) => runpod.startPod(requireKey(), id));
-handle('runpod:deletePod', async (id) => runpod.deletePod(requireKey(), id));
+handle('runpod:stopPod', async (id) => {
+  autoOpener.cancel(id);
+  return runpod.stopPod(requireKey(), id);
+});
+handle('runpod:startPod', async (id) => {
+  const res = await runpod.startPod(requireKey(), id);
+  autoOpener.watch(id); // a resumed pod gets the same treatment
+  return res;
+});
+handle('runpod:deletePod', async (id) => {
+  autoOpener.cancel(id);
+  return runpod.deletePod(requireKey(), id);
+});
 
 // Live progress — status + ComfyUI readiness + in-image container logs.
 handle('runpod:podProgress', async (id) => {

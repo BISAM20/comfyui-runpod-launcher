@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.3.2-6d5efc)
+![Version](https://img.shields.io/badge/version-1.4.0-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -64,7 +64,7 @@ then red, and says how long you have left at the current rate.
 ### Logs — every request, with secrets redacted
 ![Logs tab](assets/screenshots/03-logs.png)
 
-### Settings — manifest URL, HuggingFace token and kill switch
+### Settings — auto-open, manifest URL, HuggingFace token and kill switch
 ![Settings tab](assets/screenshots/04-settings.png)
 
 ---
@@ -76,6 +76,9 @@ then red, and says how long you have left at the current rate.
   from RunPod. Favourite GPUs pin to the top.
 - **Cost meter** — live account balance, hourly burn rate, and estimated runtime
   remaining, with clear warnings before you run out of credit.
+- **ComfyUI opens by itself** — once a pod you deploy or start is up, ComfyUI opens
+  in your default browser automatically, optionally after the model downloads have
+  finished. No need to visit My Pods and click Open ComfyUI.
 - **One-click deploy** — name the pod, pick Secure or Community, choose which
   models to pre-download, and launch. Container-disk guardrails prevent the
   common "machine does not have the resources" placement failure.
@@ -107,7 +110,8 @@ then red, and says how long you have left at the current rate.
 2. Launch the app and paste the key on the first screen.
 3. **Deploy** tab — name the pod, pick a GPU, tick the models to pre-download,
    then **Deploy Pod**.
-4. **My Pods** tab — when the pod shows `RUNNING`, click **Open ComfyUI**.
+4. ComfyUI opens in your browser on its own as soon as the pod is ready (change
+   this in **Settings**). You can also click **Open ComfyUI** on the **My Pods** tab.
 
 **Stop vs Terminate:** *Stop* pauses billing and keeps downloaded models on the
 volume; *Terminate* deletes the pod and its models. The app confirms before
@@ -812,6 +816,27 @@ above.
 
 Every release is listed here, newest first. Installers for all versions are on
 the [releases page](https://github.com/BISAM20/comfyui-runpod-launcher/releases).
+
+### v1.4.0 — ComfyUI opens by itself
+**Added**
+- **Auto-open ComfyUI.** Once a pod you deploy or start is up, ComfyUI opens in
+  your default browser automatically — no more visiting My Pods and clicking
+  *Open ComfyUI*. Choose in **Settings**: automatically when ComfyUI is ready
+  (default), automatically once it is ready *and* the model downloads have
+  finished, or never. The choice is saved, and changing it applies straight away,
+  even to a pod that is still booting.
+- The wait is careful: it needs two consecutive successful checks, so a single
+  flicker does not open an empty page; it stops if the pod exits or is
+  terminated; it gives up after 40 minutes (6 hours when waiting for downloads);
+  and it opens once per start. An image that publishes no download logs is not
+  waited on forever.
+- Short notifications say when ComfyUI opened, or that it is waiting for
+  downloads first.
+
+**Fixed**
+- The "models apply when a pod is created" notice no longer shows at startup, or
+  stays up if the pod list cannot be loaded. It hid itself with an inline style
+  the app's security policy blocks (introduced in v1.3.1).
 
 ### v1.3.2 — Bigger default volume
 **Changed**

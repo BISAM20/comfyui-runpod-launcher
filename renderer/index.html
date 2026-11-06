@@ -132,7 +132,7 @@
               sized automatically. Uncheck everything for a bare ComfyUI.
             </p>
             <p class="hint" id="modelSource"></p>
-            <p class="notice" id="runningPodNotice" style="display: none">
+            <p class="notice hidden" id="runningPodNotice">
               ⚠ These models are downloaded <b>when a pod is created</b>. You have
               a pod running already — ticking boxes here does not add models to
               it, and neither does Stop/Start. Deploy a new pod to get them.
@@ -236,6 +236,19 @@
               LoRAs). Stored encrypted on this PC and sent only to the pod you
               deploy.
             </span>
+          </div>
+
+          <div class="field">
+            <label>Open ComfyUI in my browser</label>
+            <select id="autoOpenSelect">
+              <option value="ready">Automatically, as soon as ComfyUI is ready</option>
+              <option value="downloads">
+                Automatically, once ComfyUI is ready and the model downloads have
+                finished
+              </option>
+              <option value="off">Never — I'll click Open ComfyUI myself</option>
+            </select>
+            <span class="hint" id="autoOpenHint"></span>
           </div>
 
           <div class="field">

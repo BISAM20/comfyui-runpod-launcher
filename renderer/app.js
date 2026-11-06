@@ -72,6 +72,17 @@ async function boot() {
   window.api.onLog(appendLiveLog); // stream logs into the Logs panel
 
   // Show the "cleaning up pods" overlay when the kill switch fires on close.
+  // The main process opened (or is waiting to open) ComfyUI for a pod.
+  window.api.onAutoOpen((e) => {
+    if (e.type === 'opened') toast('ComfyUI is ready — opened in your browser', 'ok');
+    else if (e.type === 'waiting-downloads')
+      toast('ComfyUI is up — waiting for model downloads to finish before opening');
+    else if (e.type === 'open-failed')
+      toast('ComfyUI is ready, but the browser would not open — use Open ComfyUI', 'err');
+    else if (e.type === 'timeout')
+      toast('Stopped waiting for ComfyUI — use Open ComfyUI when it is ready', 'err');
+  });
+
   window.api.onClosing((action) => {
     $('#closingTitle').textContent =
       action === 'terminate'
@@ -101,6 +112,8 @@ async function afterLogin() {
     // restore a saved value here — updateSummary() fills it in.
     state.volumeManual = false;
     $('#onCloseSelect').value = defaults.data.onClose || 'nothing';
+    $('#autoOpenSelect').value = defaults.data.autoOpen || 'ready';
+    updateAutoOpenHint();
     $('#manifestUrl').value = defaults.data.manifestUrl || '';
     updateKillSwitchUI();
   }
@@ -146,7 +159,19 @@ function updateRunningPodNotice() {
   const active = state.pods.some((p) =>
     ['RUNNING', 'EXITED', 'STOPPED'].includes((p.desiredStatus || '').toUpperCase())
   );
-  el.style.display = active ? '' : 'none';
+  // Toggle the `hidden` class — an inline style attribute is blocked by the CSP.
+  el.classList.toggle('hidden', !active);
+}
+
+// Explain what the auto-open setting does, in plain words.
+function updateAutoOpenHint() {
+  const hints = {
+    ready: 'When a pod you deploy or start is up, ComfyUI opens in your browser on its own.',
+    downloads:
+      'ComfyUI opens only after the models you ticked have finished downloading, so everything is in place when it appears. Large packs can take a while.',
+    off: 'Nothing opens by itself. Use Open ComfyUI on the My Pods tab.',
+  };
+  $('#autoOpenHint').textContent = hints[$('#autoOpenSelect').value] || '';
 }
 
 // Reflect the kill-switch setting in the hint + the sidebar "armed" badge.
@@ -508,7 +533,12 @@ async function deploy() {
     });
     msg.className = 'msg success';
     msg.textContent =
-      '✓ Pod created! It is booting now — open the My Pods tab to get your ComfyUI link.';
+      $('#autoOpenSelect').value === 'off'
+        ? '✓ Pod created! It is booting now — open the My Pods tab to get your ComfyUI link.'
+        : '✓ Pod created! It is booting now — ComfyUI will open in your browser automatically' +
+          ($('#autoOpenSelect').value === 'downloads'
+            ? ' once the model downloads have finished.'
+            : ' as soon as it is ready.');
     toast('Pod deployed', 'ok');
     setTimeout(loadBalance, 3000); // burn rate just changed
     setTimeout(() => showTab('pods'), 900);
@@ -823,6 +853,17 @@ function wireEvents() {
   $('#changeKeyBtn').addEventListener('click', async () => {
     await window.api.clearApiKey();
     showScreen('#screen-setup');
+  });
+
+  // Auto-open selector — save immediately on change.
+  $('#autoOpenSelect').addEventListener('change', async () => {
+    const val = $('#autoOpenSelect').value;
+    await window.api.setAutoOpen(val);
+    updateAutoOpenHint();
+    toast(
+      val === 'off' ? 'ComfyUI will not open automatically' : 'ComfyUI will open automatically',
+      'ok'
+    );
   });
 
   // Kill switch selector — save immediately on change.
