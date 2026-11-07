@@ -66,7 +66,9 @@ jobs:
           node tools/test-main-wiring.js
 
       - name: Build the installer
-        run: npm run dist
+        # --publish never: in CI electron-builder otherwise tries to publish by
+        # itself and fails without a token. Publishing is the last job below.
+        run: npm run dist -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false' # signing happens in the next job, not here
 
