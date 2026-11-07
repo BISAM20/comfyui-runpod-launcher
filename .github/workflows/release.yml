@@ -1,0 +1,151 @@
+# =============================================================================
+# Build, test, (optionally) sign, and publish the Windows installer.
+#
+#   * Push a tag like v1.5.0   -> build + test + sign (if configured) + publish
+#   * "Run workflow" button    -> build + test only; uploads the installer as a
+#                                 workflow artifact and NEVER publishes a release
+#
+# Signing uses the free SignPath Foundation program for open-source projects.
+# It stays OFF until the repository variable SIGNPATH_ORGANIZATION_ID is set
+# (see docs/code-signing.md), so this workflow already works unsigned today.
+#
+# Safety rules built in:
+#   * If signing is configured and fails, nothing is published — the workflow
+#     never quietly falls back to an unsigned release.
+#   * The tag must match package.json's version.
+#   * Every third-party action is pinned to an exact commit, because this
+#     workflow holds a signing token.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test (Windows)
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Read the version from package.json
+        id: meta
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: The tag must match package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "v${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version v${{ steps.meta.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Tests (no network, no real RunPod account needed)
+        shell: bash
+        run: |
+          node tools/test-autoopen.js
+          node tools/test-balance.js
+          node tools/test-main-wiring.js
+
+      - name: Build the installer
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false' # signing happens in the next job, not here
+
+      - name: Upload the unsigned installer
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-installer
+          path: release/ComfyUI RunPod Launcher Setup ${{ steps.meta.outputs.version }}.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  sign:
+    name: Sign with SignPath
+    needs: build
+    # Off until SignPath is set up: define the repository variable
+    # SIGNPATH_ORGANIZATION_ID (Settings > Secrets and variables > Actions).
+    if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit the signing request
+        id: sign
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+          parameters: |
+            version: "${{ needs.build.outputs.version }}"
+
+      - name: Keep the signed installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-installer
+          path: signed/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish the GitHub release
+    needs: [build, sign]
+    # Only for tags. Signing must have succeeded OR been intentionally off — if it
+    # was configured and failed, nothing is published.
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success' && (needs.sign.result == 'success' || needs.sign.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fetch the signed installer
+        if: ${{ needs.sign.result == 'success' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: signed-installer
+          path: dist
+
+      - name: Fetch the unsigned installer (signing is not configured)
+        if: ${{ needs.sign.result == 'skipped' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-installer
+          path: dist
+
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          SIGNED: ${{ needs.sign.result == 'success' }}
+        run: |
+          ls -l dist
+          notes="RELEASE_NOTES_${TAG}.md"
+          args=(--title "${TAG}")
+          if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+          if [ "$SIGNED" != "true" ]; then echo "::warning::Publishing an UNSIGNED installer (SignPath is not configured)."; fi
+          # Fails if the release already exists — it never overwrites one silently.
+          gh release create "${TAG}" dist/*.exe "${args[@]}"

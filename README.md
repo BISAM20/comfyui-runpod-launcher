@@ -18,7 +18,8 @@ the pod. All from one window.
 **[Studio models & workflows](#comfyui-studio--models--workflows)** ·
 **[Model catalog](#model-catalog-modelsjson)** ·
 **[Build from source](#build-from-source)** ·
-**[Version history](#version-history)**
+**[Version history](#version-history)** ·
+**[Code signing policy](#code-signing-policy)**
 
 ---
 
@@ -922,8 +923,49 @@ the [releases page](https://github.com/BISAM20/comfyui-runpod-launcher/releases)
 ## Notes
 
 - The RunPod API key is stored encrypted locally and transmitted only to RunPod.
-- The app is currently **unsigned**; a code-signing certificate would remove the
-  Windows SmartScreen prompt.
+- The installer is currently **unsigned**, so Windows SmartScreen shows a warning on
+  first run. See the [code signing policy](#code-signing-policy).
+
+## Code signing policy
+
+**Status: not signed yet.** Installers are currently unsigned, which is why Windows
+SmartScreen asks you to confirm with *More info → Run anyway*. The project is
+preparing to sign releases through the free
+[SignPath Foundation](https://signpath.org/) program for open-source software.
+Once that is approved, releases will be signed with a certificate issued to
+SignPath Foundation, and this section will say so.
+
+Signing will not remove the SmartScreen prompt immediately: Microsoft says a new
+publisher has to build a reputation over several weeks of clean downloads. What it
+changes is that the prompt names a verified publisher instead of "unknown".
+
+**How releases are built.** Every release is built from this repository by a
+[GitHub Actions workflow](.github/workflows/release.yml) on GitHub-hosted runners,
+after the test suite passes. Nothing is published unless the workflow succeeds.
+Maintainer setup: [docs/code-signing.md](docs/code-signing.md).
+
+| Role | Who |
+|---|---|
+| Author — maintains the source code | Bishoy ([@BISAM20](https://github.com/BISAM20)) |
+| Approver — approves each signing request | Bishoy ([@BISAM20](https://github.com/BISAM20)) |
+
+**Privacy.** The app has no telemetry, analytics or automatic updates. It stores
+your RunPod API key and optional HuggingFace token encrypted on your own PC
+(Windows data protection) and uses them only as follows:
+
+- **RunPod** (`rest.runpod.io`, `api.runpod.io`) — to list GPUs, deploy and manage
+  your pods, and read your balance. Your API key is sent here.
+- **Your own pods** (`*.proxy.runpod.net`) — to check that ComfyUI is up and to
+  read the pod's progress logs. No credentials are sent.
+- **Docker Hub** (`auth.docker.io`, `registry-1.docker.io`) — to read a public
+  image's model list. No credentials are sent.
+- **Your HuggingFace token**, if you save one, is sent to RunPod as part of the pod's
+  environment so the pod can download gated models.
+- Links such as the RunPod console open in your normal browser only when you click them.
+
+**Reporting a problem.** If you think a release is malicious or mis-signed, open an
+[issue](https://github.com/BISAM20/comfyui-runpod-launcher/issues) with the file name
+and its SHA-256 hash (`Get-FileHash <file>` in PowerShell).
 
 ## License
 
