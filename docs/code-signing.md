@@ -102,8 +102,10 @@ with the signed wording, and update the SmartScreen note in *Download*.
 
 Releases come from CI, because the signature has to vouch for a verifiable build.
 
-1. Bump `version` in `package.json` and the README badge; add the README *Version
-   history* entry; write `RELEASE_NOTES_vX.Y.Z.md`.
+1. Bump `version` in `package.json` and the README badge; update the README
+   *What's new* section (add a table row, make the new version the expanded entry,
+   and collapse the previous one under *Earlier releases*); write
+   `RELEASE_NOTES_vX.Y.Z.md`.
 2. Commit and push to `main`.
 3. Tag and push the tag:
    ```bash

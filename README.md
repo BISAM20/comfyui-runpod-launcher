@@ -12,14 +12,179 @@ the pod. All from one window.
 
 ---
 
-**[Download](#download)** · **[Screenshots](#screenshots)** ·
+**[What's new](#whats-new)** · **[Download](#download)** ·
+**[Screenshots](#screenshots)** ·
 **[Features](#features)** · **[Getting started](#getting-started)** ·
 **[Images](#the-docker-images-it-deploys)** ·
 **[Studio models & workflows](#comfyui-studio--models--workflows)** ·
 **[Model catalog](#model-catalog-modelsjson)** ·
 **[Build from source](#build-from-source)** ·
-**[Version history](#version-history)** ·
 **[Code signing policy](#code-signing-policy)**
+
+---
+
+## What's new
+
+<!-- MAINTAINERS, when you release: (1) add a row to the table, (2) make the new version
+     the expanded entry, (3) move the previous expanded entry into a collapsed block below. -->
+Newest first. Installers for every version are on the
+[releases page](https://github.com/BISAM20/comfyui-runpod-launcher/releases).
+
+| Version | Date | What changed |
+|---|---|---|
+| [v1.4.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.0) | 2026-11-06 | ComfyUI opens by itself |
+| [v1.3.2](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.2) | 2026-07-28 | Bigger default volume |
+| [v1.3.1](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.1) | 2026-07-25 | Fix silently-ignored model selections |
+| [v1.3.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.0) | 2026-07-25 | See what's inside each model pack |
+| [v1.2.1](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.2.1) | 2026-07-25 | Model list follows the Docker image |
+| [v1.2.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.2.0) | 2026-07-24 | Cost meter, HuggingFace token, image-defined models |
+| [v1.1.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.1.0) | 2026-07-23 | Availability, progress, and a kill switch |
+| v1.0.0 | 2026-07-23 | First build (never published; v1.1.0 was the first download) |
+
+### v1.4.0 — ComfyUI opens by itself
+
+*Released 2026-11-06 · [release page and installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.0)*
+
+**Added**
+- **Auto-open ComfyUI.** Once a pod you deploy or start is up, ComfyUI opens in
+  your default browser automatically — no more visiting My Pods and clicking
+  *Open ComfyUI*. Choose in **Settings**: automatically when ComfyUI is ready
+  (default), automatically once it is ready *and* the model downloads have
+  finished, or never. The choice is saved, and changing it applies straight away,
+  even to a pod that is still booting.
+- The wait is careful: it needs two consecutive successful checks, so a single
+  flicker does not open an empty page; it stops if the pod exits or is
+  terminated; it gives up after 40 minutes (6 hours when waiting for downloads);
+  and it opens once per start. An image that publishes no download logs is not
+  waited on forever.
+- Short notifications say when ComfyUI opened, or that it is waiting for
+  downloads first.
+
+**Fixed**
+- The "models apply when a pod is created" notice no longer shows at startup, or
+  stays up if the pod list cannot be loaded. It hid itself with an inline style
+  the app's security policy blocks (introduced in v1.3.1).
+
+### Earlier releases
+
+<details>
+<summary><b>v1.3.2</b> — Bigger default volume <i>(2026-07-28)</i></summary>
+
+**Changed**
+- Auto volume sizing now adds **200 GB** of headroom on top of the selected
+  models, up from 50 GB. A pod with no models selected starts at 200 GB, and
+  each model adds its own size — enough room for generated output and extra
+  models pulled later from ComfyUI-Manager without resizing.
+- Typing your own value still switches the field to manual; clear it to go back
+  to automatic.
+
+</details>
+
+<details>
+<summary><b>v1.3.1</b> — Fix silently-ignored model selections <i>(2026-07-25)</i></summary>
+
+**Fixed**
+- The built-in fallback model list was shown for **any** image when its manifest
+  could not be read. Its `DOWNLOAD_*` flags belong to `comfyui-wan`; other images
+  ignore unknown flags, so a pod deployed and downloaded nothing with no error.
+  The fallback is now restricted to its own image, and other images show an
+  explicit error with no model rows instead of flags that would do nothing.
+- The model list no longer flashes the built-in list before the real catalog
+  loads.
+
+**Added**
+- A warning on the Deploy tab whenever a pod already exists: models are applied
+  **when a pod is created**, so ticking them cannot affect a running pod (RunPod
+  cannot change a running pod's environment, not even across Stop/Start).
+
+</details>
+
+<details>
+<summary><b>v1.3.0</b> — See what's inside each model pack <i>(2026-07-25)</i></summary>
+
+**Added**
+- Every model pack expands to list the exact models and LoRAs it downloads, so
+  `LTX-2.3 Official LoRAs` is no longer an opaque flag name.
+- Manifests gained an optional `items` array and an `approx` flag; estimated
+  sizes display as `≈`.
+
+**Changed**
+- Packs published by an image show readable names, real descriptions and
+  measured sizes instead of `LTX23 Loras — Declared by the image`.
+
+</details>
+
+<details>
+<summary><b>v1.2.1</b> — Model list follows the Docker image <i>(2026-07-25)</i></summary>
+
+**Fixed**
+- The model list only refreshed from a running pod, so switching images kept
+  showing the previous list. The catalog is now read from the image on Docker
+  Hub before any pod exists — from a `com.comfyui.models` label when present,
+  otherwise derived from the image's own `DOWNLOAD_*` environment variables.
+- A running pod is only used as a catalog source when its image matches the one
+  being deployed.
+- Model names derived from environment variables are formatted properly
+  (`LTX23 Dev FP8`, `WAN22 T2V`).
+
+**Changed**
+- Auto volume sizing assumes a conservative size for models with no published
+  size rather than under-provisioning the volume (shown as `≥`).
+
+</details>
+
+<details>
+<summary><b>v1.2.0</b> — Cost meter, HuggingFace token, image-defined models <i>(2026-07-24)</i></summary>
+
+**Added**
+- **Cost meter** — live account balance, hourly burn rate and estimated runtime
+  remaining, with low-balance warnings.
+- **HuggingFace token** — saved encrypted once in Settings and applied to every
+  deploy, for gated or private models.
+- **Model list from the Docker image** — the image publishes a `models.json`
+  catalog the app reads, so updating the image updates the list.
+- **Automatic volume sizing** — the volume disk is calculated from the selected
+  models plus 50 GB of headroom (raised to 200 GB in v1.3.2); typing a value switches to manual.
+
+</details>
+
+<details>
+<summary><b>v1.1.0</b> — Availability, progress, and a kill switch <i>(2026-07-23)</i></summary>
+
+**Added**
+- **Live GPU availability** — only available GPUs are listed, with High /
+  Medium / Low badges; RTX PRO 6000, A40 and RTX PRO 4500 pin to the top.
+- **Progress / Logs panel** — per-pod status timeline, ComfyUI-readiness probe
+  and streaming container logs.
+- **Logs tab** — every RunPod request and error, with secrets redacted.
+- **Kill switch** — optionally stop or terminate running pods when the app
+  closes (off by default).
+
+**Fixed**
+- Container-disk guardrails that prevent the common *"machine does not have the
+  resources"* placement failure.
+
+</details>
+
+<details>
+<summary><b>v1.0.0</b> — First build <i>(2026-07-23)</i></summary>
+
+- Deploy a ComfyUI pod on RunPod: API key setup, GPU picker with live pricing,
+  model pre-download selection, and Stop / Start / Terminate pod management. *(never published as a release; v1.1.0 was the first public download)*
+
+</details>
+
+### Docker image updates
+
+The model and workflow images are updated separately from the app, and the app picks the
+changes up by itself — see [`comfyui-studio` — models & workflows](#comfyui-studio--models--workflows).
+
+- **2026-11-06 — `comfyui-studio` rebuilt.** ComfyUI v0.44.0, and every custom node at its
+  latest version at the time of the build. The model catalog was corrected: the Kijai pack
+  lists its 9 files, Krea 2 LoRAs its 11, and FLUX.2 Klein 9B is flagged as needing a
+  HuggingFace token.
+- **By 2026-09-25 — new models.** LTX-2.5 (bf16, int8, IC-LoRAs), MiniMax-H3 (video + audio,
+  reference-to-video, ControlNet Union), MoGe-2 and SAM3.1.
 
 ---
 
@@ -810,113 +975,6 @@ npm run dist       # build the Windows installer into release/
 `renderer/models.js` holds only the offline **fallback** catalog. The real model
 list comes from the Docker image — see [Model catalog](#model-catalog-modelsjson)
 above.
-
----
-
-## Version history
-
-Every release is listed here, newest first. Installers for all versions are on
-the [releases page](https://github.com/BISAM20/comfyui-runpod-launcher/releases).
-
-### v1.4.0 — ComfyUI opens by itself
-**Added**
-- **Auto-open ComfyUI.** Once a pod you deploy or start is up, ComfyUI opens in
-  your default browser automatically — no more visiting My Pods and clicking
-  *Open ComfyUI*. Choose in **Settings**: automatically when ComfyUI is ready
-  (default), automatically once it is ready *and* the model downloads have
-  finished, or never. The choice is saved, and changing it applies straight away,
-  even to a pod that is still booting.
-- The wait is careful: it needs two consecutive successful checks, so a single
-  flicker does not open an empty page; it stops if the pod exits or is
-  terminated; it gives up after 40 minutes (6 hours when waiting for downloads);
-  and it opens once per start. An image that publishes no download logs is not
-  waited on forever.
-- Short notifications say when ComfyUI opened, or that it is waiting for
-  downloads first.
-
-**Fixed**
-- The "models apply when a pod is created" notice no longer shows at startup, or
-  stays up if the pod list cannot be loaded. It hid itself with an inline style
-  the app's security policy blocks (introduced in v1.3.1).
-
-### v1.3.2 — Bigger default volume
-**Changed**
-- Auto volume sizing now adds **200 GB** of headroom on top of the selected
-  models, up from 50 GB. A pod with no models selected starts at 200 GB, and
-  each model adds its own size — enough room for generated output and extra
-  models pulled later from ComfyUI-Manager without resizing.
-- Typing your own value still switches the field to manual; clear it to go back
-  to automatic.
-
-### v1.3.1 — Fix silently-ignored model selections
-**Fixed**
-- The built-in fallback model list was shown for **any** image when its manifest
-  could not be read. Its `DOWNLOAD_*` flags belong to `comfyui-wan`; other images
-  ignore unknown flags, so a pod deployed and downloaded nothing with no error.
-  The fallback is now restricted to its own image, and other images show an
-  explicit error with no model rows instead of flags that would do nothing.
-- The model list no longer flashes the built-in list before the real catalog
-  loads.
-
-**Added**
-- A warning on the Deploy tab whenever a pod already exists: models are applied
-  **when a pod is created**, so ticking them cannot affect a running pod (RunPod
-  cannot change a running pod's environment, not even across Stop/Start).
-
-### v1.3.0 — See what's inside each model pack
-**Added**
-- Every model pack expands to list the exact models and LoRAs it downloads, so
-  `LTX-2.3 Official LoRAs` is no longer an opaque flag name.
-- Manifests gained an optional `items` array and an `approx` flag; estimated
-  sizes display as `≈`.
-
-**Changed**
-- Packs published by an image show readable names, real descriptions and
-  measured sizes instead of `LTX23 Loras — Declared by the image`.
-
-### v1.2.1 — Model list follows the Docker image
-**Fixed**
-- The model list only refreshed from a running pod, so switching images kept
-  showing the previous list. The catalog is now read from the image on Docker
-  Hub before any pod exists — from a `com.comfyui.models` label when present,
-  otherwise derived from the image's own `DOWNLOAD_*` environment variables.
-- A running pod is only used as a catalog source when its image matches the one
-  being deployed.
-- Model names derived from environment variables are formatted properly
-  (`LTX23 Dev FP8`, `WAN22 T2V`).
-
-**Changed**
-- Auto volume sizing assumes a conservative size for models with no published
-  size rather than under-provisioning the volume (shown as `≥`).
-
-### v1.2.0 — Cost meter, HuggingFace token, image-defined models
-**Added**
-- **Cost meter** — live account balance, hourly burn rate and estimated runtime
-  remaining, with low-balance warnings.
-- **HuggingFace token** — saved encrypted once in Settings and applied to every
-  deploy, for gated or private models.
-- **Model list from the Docker image** — the image publishes a `models.json`
-  catalog the app reads, so updating the image updates the list.
-- **Automatic volume sizing** — the volume disk is calculated from the selected
-  models plus 50 GB of headroom (raised to 200 GB in v1.3.2); typing a value switches to manual.
-
-### v1.1.0 — Availability, progress, and a kill switch
-**Added**
-- **Live GPU availability** — only available GPUs are listed, with High /
-  Medium / Low badges; RTX PRO 6000, A40 and RTX PRO 4500 pin to the top.
-- **Progress / Logs panel** — per-pod status timeline, ComfyUI-readiness probe
-  and streaming container logs.
-- **Logs tab** — every RunPod request and error, with secrets redacted.
-- **Kill switch** — optionally stop or terminate running pods when the app
-  closes (off by default).
-
-**Fixed**
-- Container-disk guardrails that prevent the common *"machine does not have the
-  resources"* placement failure.
-
-### v1.0.0 — First release
-- Deploy a ComfyUI pod on RunPod: API key setup, GPU picker with live pricing,
-  model pre-download selection, and Stop / Start / Terminate pod management.
 
 ---
 
