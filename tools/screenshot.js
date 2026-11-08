@@ -12,7 +12,6 @@ const fs = require('fs');
 const OUT = path.join(__dirname, '..', 'assets', 'screenshots');
 fs.mkdirSync(OUT, { recursive: true });
 
-const STUDIO_IMAGE = 'bishoy22/comfyui-studio:latest';
 const STUDIO_MANIFEST = path.join(
   __dirname, '..', '..', 'Runpod_docker', 'LTX_Krea', 'models.json'
 );
@@ -81,7 +80,6 @@ app.whenReady().then(async () => {
     await run(win, `
       (function(){
         window.MODEL_CATALOG = ${JSON.stringify(studio.models)};
-        document.getElementById('imageName').value = ${JSON.stringify(STUDIO_IMAGE)};
         var note = document.getElementById('modelSource');
         note.textContent = '✓ ${studio.models.length} models from image label';
         note.style.color = 'var(--green)';
@@ -90,7 +88,6 @@ app.whenReady().then(async () => {
       })();
     `);
   } else {
-    await run(win, `document.getElementById('imageName').value = ${JSON.stringify(STUDIO_IMAGE)};`);
   }
 
   // Tick a realistic selection that features the newest packs: LTX-2.3 Dev FP8,

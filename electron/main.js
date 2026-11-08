@@ -10,8 +10,9 @@ const store = require('./store');
 const log = require('./logger');
 const { createAutoOpener } = require('./autoopen');
 
-// The Docker image this launcher deploys. Change here if you rename the repo.
-const DEFAULT_IMAGE = 'bishoy22/comfyui-wan:latest';
+// The ONE Docker image this launcher deploys. It is fixed: the renderer cannot
+// choose a different one, and an image saved by an older version is ignored.
+const DEFAULT_IMAGE = 'bishoy22/comfyui-studio:latest';
 
 let mainWindow = null;
 
@@ -88,6 +89,14 @@ log.bus.on('log', (entry) => {
 });
 
 app.whenReady().then(() => {
+  // The image used to be a saved, editable setting. It is fixed now, so drop any
+  // old value — otherwise an upgrade from 1.4.0 or earlier would keep pointing
+  // at the retired comfyui-wan image.
+  const saved = store.loadSettings();
+  if ('image' in saved) {
+    delete saved.image;
+    store.saveSettings(saved);
+  }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -167,14 +176,25 @@ handle('settings:clearApiKey', async () => {
   return true;
 });
 
+// Forget EVERYTHING secret saved on this PC: the RunPod key and the HuggingFace
+// token. (clearApiKey above, used by "Change key", clears only the RunPod key.)
+handle('settings:forgetKeys', async () => {
+  autoOpener.cancelAll(); // nothing may keep acting on the account we just forgot
+  store.clearApiKey();
+  store.clearHfToken();
+  log.info('Saved RunPod key and HuggingFace token removed from this PC');
+  return { apiKey: store.hasApiKey(), hfToken: store.hasHfToken() };
+});
+
 handle('settings:getDeployDefaults', async () => {
   const s = store.loadSettings();
-  return { image: DEFAULT_IMAGE, autoOpen: 'ready', ...s };
+  return { autoOpen: 'ready', ...s, image: DEFAULT_IMAGE }; // image always wins
 });
 
 handle('settings:saveDeployDefaults', async (obj) => {
   const s = store.loadSettings();
-  store.saveSettings({ ...s, ...obj }); // merge — never drop other settings
+  const { image: _ignored, ...rest } = obj || {}; // the image is not a setting any more
+  store.saveSettings({ ...s, ...rest }); // merge — never drop other settings
   return true;
 });
 
@@ -194,13 +214,14 @@ handle('settings:clearHfToken', async () => {
 handle('runpod:balance', async () => runpod.getBalance(requireKey()));
 
 // --- Model catalog, defined by the Docker image rather than the app ---
-// Tries, in order: the configured manifest URL, then any running pod (which
-// serves /models.json on its log server). The renderer falls back to its
-// bundled list if both fail, so the UI always works.
-handle('runpod:modelManifest', async (imageOverride) => {
+// Tries, in order: the configured manifest URL, the ComfyUI Studio image's own
+// label on Docker Hub, then a running pod (which serves /models.json on its log
+// server). If all fail the renderer shows an explanation and no model rows — there
+// is deliberately no bundled list that could drift from the image.
+handle('runpod:modelManifest', async () => {
   const settings = store.loadSettings();
   const url = (settings.manifestUrl || '').trim();
-  const image = (imageOverride || settings.image || DEFAULT_IMAGE || '').trim();
+  const image = DEFAULT_IMAGE; // the catalog of THE image we deploy, nothing else
 
   // 1. Explicit manifest URL wins.
   if (url) {
@@ -221,7 +242,7 @@ handle('runpod:modelManifest', async (imageOverride) => {
     }
   }
 
-  // 3. Fall back to a running pod on that same image (rich models.json).
+  // 3. Fall back to a running pod (rich models.json).
   const key = store.getApiKey();
   if (key) {
     try {
@@ -261,7 +282,8 @@ handle('settings:setAutoOpen', async (mode) => {
 handle('runpod:gpuTypes', async () => runpod.listGpuTypes(requireKey()));
 
 handle('runpod:createPod', async (opts) => {
-  const merged = { imageName: DEFAULT_IMAGE, ...opts };
+  // Always the fixed image — whatever the renderer sent for imageName is ignored.
+  const merged = { ...opts, imageName: DEFAULT_IMAGE };
   // Inject the saved HuggingFace token unless the deploy form supplied one.
   // Kept out of the renderer so the token never has to travel through the UI.
   if (!merged.env || !merged.env.HF_TOKEN) {

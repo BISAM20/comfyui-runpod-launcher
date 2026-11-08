@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.4.0-6d5efc)
+![Version](https://img.shields.io/badge/version-1.4.1-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -15,7 +15,7 @@ the pod. All from one window.
 **[What's new](#whats-new)** · **[Download](#download)** ·
 **[Screenshots](#screenshots)** ·
 **[Features](#features)** · **[Getting started](#getting-started)** ·
-**[Images](#the-docker-images-it-deploys)** ·
+**[Image](#the-docker-image-it-deploys)** ·
 **[Studio models & workflows](#comfyui-studio--models--workflows)** ·
 **[Model catalog](#model-catalog-modelsjson)** ·
 **[Build from source](#build-from-source)** ·
@@ -32,6 +32,7 @@ Newest first. Installers for every version are on the
 
 | Version | Date | What changed |
 |---|---|---|
+| [v1.4.1](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.1) | 2026-11-08 | Saved keys no longer outlive the app; ComfyUI Studio is the only image |
 | [v1.4.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.0) | 2026-11-06 | ComfyUI opens by itself |
 | [v1.3.2](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.2) | 2026-07-28 | Bigger default volume |
 | [v1.3.1](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.1) | 2026-07-25 | Fix silently-ignored model selections |
@@ -41,9 +42,40 @@ Newest first. Installers for every version are on the
 | [v1.1.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.1.0) | 2026-07-23 | Availability, progress, and a kill switch |
 | v1.0.0 | 2026-07-23 | First build (never published; v1.1.0 was the first download) |
 
-### v1.4.0 — ComfyUI opens by itself
+### v1.4.1 — Saved keys no longer outlive the app
 
-*Released 2026-11-06 · [release page and installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.0)*
+*Released 2026-11-08 · [release page and installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.1)*
+
+**Fixed**
+- **Saved keys survived an uninstall.** The app keeps your RunPod API key and
+  HuggingFace token on your own PC. Uninstalling used to leave them behind, so
+  reinstalling started already signed in with the old key. The uninstaller now removes
+  them together with the app's saved settings. Installing a new version over an old one
+  still keeps everything, so updates do not sign you out.
+
+**Added**
+- **Forget saved keys** in Settings: removes your RunPod key *and* your HuggingFace
+  token from this PC in one step. *Change key* only ever cleared the RunPod key.
+- A plain explanation of where keys are stored and what the encryption does and does
+  not protect against — see the [Privacy](#code-signing-policy) notes.
+
+**Changed**
+- **ComfyUI Studio is the only image.** The app deploys `bishoy22/comfyui-studio:latest`
+  and nothing else, and the Docker image setting is now read-only. An image saved by an
+  older version is ignored, so upgrading no longer leaves anyone pointed at the retired
+  `comfyui-wan` image.
+- The built-in fallback model list is gone. It belonged to `comfyui-wan`, and a copy kept
+  for Studio would drift from the image. If the model list cannot be read the app now says
+  so, and you can still deploy a bare ComfyUI.
+
+**If you ever gave someone your RunPod key**, replace it: delete the old key in the
+RunPod console (Settings → API Keys) and create a new one. Removing the app from their PC
+does not remove the key from your account.
+
+### Earlier releases
+
+<details>
+<summary><b>v1.4.0</b> — ComfyUI opens by itself <i>(2026-11-06)</i></summary>
 
 **Added**
 - **Auto-open ComfyUI.** Once a pod you deploy or start is up, ComfyUI opens in
@@ -65,7 +97,7 @@ Newest first. Installers for every version are on the
   stays up if the pod list cannot be loaded. It hid itself with an inline style
   the app's security policy blocks (introduced in v1.3.1).
 
-### Earlier releases
+</details>
 
 <details>
 <summary><b>v1.3.2</b> — Bigger default volume <i>(2026-07-28)</i></summary>
@@ -179,6 +211,8 @@ Newest first. Installers for every version are on the
 The model and workflow images are updated separately from the app, and the app picks the
 changes up by itself — see [`comfyui-studio` — models & workflows](#comfyui-studio--models--workflows).
 
+- **2026-11-08 — `comfyui-studio` is now the only image.** The older `comfyui-wan` image is
+  retired: the app no longer deploys it. If you are on v1.4.0 or earlier, update the app.
 - **2026-11-06 — `comfyui-studio` rebuilt.** ComfyUI v0.44.0, and every custom node at its
   latest version at the time of the build. The model catalog was corrected: the Kijai pack
   lists its 9 files, Krea 2 LoRAs its 11, and FLUX.2 Klein 9B is flagged as needing a
@@ -251,9 +285,9 @@ then red, and says how long you have left at the current rate.
 - **Automatic volume sizing** — the volume disk is sized from the models you
   select, plus 200 GB of headroom. Override it any time.
 - **Model list comes from the image** — the downloadable models are published by
-  the Docker image itself, so pointing the app at a different image changes the
-  list to match. Each pack can be expanded to show exactly which files and LoRAs
-  it contains before you download it.
+  the ComfyUI Studio image itself, so the list is always what the image really
+  offers. Each pack can be expanded to show exactly which files and LoRAs it
+  contains before you download it.
 - **HuggingFace token** — saved encrypted for gated or private models.
 - **Pod management** — live status, direct **Open ComfyUI** and **JupyterLab**
   links, and **Stop** / **Start** / **Terminate** controls.
@@ -263,8 +297,10 @@ then red, and says how long you have left at the current rate.
   tokens automatically redacted.
 - **Kill switch** — optionally stop or terminate running pods when the app is
   closed so nothing is left billing (off by default).
-- **Encrypted key storage** — the RunPod API key is stored encrypted on the
-  local machine (Windows DPAPI) and is only ever sent to RunPod.
+- **Your keys stay on your PC** — the RunPod API key and HuggingFace token are stored
+  encrypted on the local machine (Windows data protection) and sent only to RunPod.
+  **Uninstalling the app removes them**, and **Forget saved keys** in Settings removes
+  them on demand.
 
 ---
 
@@ -285,18 +321,12 @@ terminating.
 
 ---
 
-## The Docker images it deploys
+## The Docker image it deploys
 
-Any ComfyUI image that uses `DOWNLOAD_*` environment variables works. Two are
-maintained for this launcher — set one in **Settings → Docker image**:
-
-| Image | Focus |
-|---|---|
-| `bishoy22/comfyui-studio:latest` | LTX-2.5 · MiniMax-H3 · LTX-2.3 · Krea 2 · FLUX.2 Klein · Wan 2.x |
-| `bishoy22/comfyui-wan:latest` | Wan 2.1 / 2.2 video + LTX-2.3 |
-
-Both are self-contained (ComfyUI installed directly on a CUDA base, launched by
-their own `start.sh`) and expose:
+The launcher deploys **`bishoy22/comfyui-studio:latest`** — the only image it uses. It is
+self-contained (ComfyUI installed directly on a CUDA base, launched by its own `start.sh`),
+with LTX-2.5, MiniMax-H3, LTX-2.3, Krea 2, FLUX.2 Klein and Wan 2.x available to download
+on demand, and it exposes:
 
 | Port | Service |
 |---|---|
@@ -306,7 +336,7 @@ their own `start.sh`) and expose:
 
 Models are downloaded on demand via `DOWNLOAD_*` environment variables the app
 sets for you, and are stored on the pod's `/workspace` volume so they survive
-Stop/Start.
+Stop/Start. (The older `comfyui-wan` image is retired and is no longer offered.)
 
 ---
 
@@ -901,21 +931,18 @@ All 41 nodes installed in the image, each at its latest upstream commit when the
 
 ## Model catalog (`models.json`)
 
-The list of downloadable models is defined by the **image**, not the app — point
-the app at a different image and the model list changes to match. The catalog is
+The list of downloadable models is defined by the **image**, not the app. The catalog is
 resolved in this order, all before any pod exists:
 
 1. **Manifest URL** — if one is set in **Settings → Model manifest URL**.
-2. **The image on Docker Hub** — a `com.comfyui.models` label carrying the full
-   catalog (names, descriptions, sizes). Images without that label still work:
-   the app reads their `DOWNLOAD_*` environment variables and lists those, with
-   sizes shown as unknown.
-3. **A running pod** on the same image, which serves `models.json` on port 8189.
+2. **The ComfyUI Studio image on Docker Hub** — a `com.comfyui.models` label carrying the
+   full catalog (names, descriptions, sizes).
+3. **A running pod**, which serves `models.json` on port 8189.
 
-If none are reachable, the app falls back to a small built-in list — but **only
-for the image that list was written for**. For any other image it shows an error
-instead of guessing, because a `DOWNLOAD_*` flag an image does not declare is
-silently ignored by its `start.sh`: the pod would deploy and download nothing.
+If none are reachable, the app says so and shows no model rows. There is deliberately no
+built-in list: a static copy would drift from the image, and a `DOWNLOAD_*` flag the image
+does not declare is silently ignored by its `start.sh` — the pod would deploy and download
+nothing. You can still deploy a bare ComfyUI.
 
 > **Models are applied when a pod is created.** RunPod cannot change a running
 > pod's environment, so ticking models has no effect on an existing pod — not
@@ -970,17 +997,15 @@ npm run dist       # build the Windows installer into release/
 | `electron/store.js` | Encrypted API-key + settings storage. |
 | `electron/logger.js` | In-app log bus with secret redaction. |
 | `electron/preload.js` | Safe bridge exposed to the UI. |
-| `renderer/` | UI — `index.html`, `styles.css`, `app.js`, `models.js`. |
+| `renderer/` | UI — `index.html`, `styles.css`, `app.js`. |
 
-`renderer/models.js` holds only the offline **fallback** catalog. The real model
-list comes from the Docker image — see [Model catalog](#model-catalog-modelsjson)
-above.
 
 ---
 
 ## Notes
 
-- The RunPod API key is stored encrypted locally and transmitted only to RunPod.
+- Your RunPod key and HuggingFace token are stored encrypted on your PC, removed when you
+  uninstall, and sent only where the [privacy notes](#code-signing-policy) say.
 - The installer is currently **unsigned**, so Windows SmartScreen shows a warning on
   first run. See the [code signing policy](#code-signing-policy).
 
@@ -1020,6 +1045,15 @@ your RunPod API key and optional HuggingFace token encrypted on your own PC
 - **Your HuggingFace token**, if you save one, is sent to RunPod as part of the pod's
   environment so the pod can download gated models.
 - Links such as the RunPod console open in your normal browser only when you click them.
+
+**Where your keys live, and what protects them.** Your RunPod key and HuggingFace token are
+saved in the `comfyui-runpod-launcher` folder inside your `%APPDATA%` folder, encrypted with
+Windows data protection. That stops the files from working if they are copied to another PC
+or Windows account, but it does **not** hide them from whoever uses *your* Windows account:
+the app, and any program you run, can read them. So do not use the app on a Windows account
+you share, and if you ever give someone your key, replace it in the RunPod console.
+**Uninstalling the app deletes these files** (installing a newer version over it keeps them),
+and **Settings → Forget saved keys** deletes them at any time.
 
 **Reporting a problem.** If you think a release is malicious or mis-signed, open an
 [issue](https://github.com/BISAM20/comfyui-runpod-launcher/issues) with the file name

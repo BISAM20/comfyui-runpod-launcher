@@ -1,6 +1,6 @@
 {
   "name": "comfyui-runpod-launcher",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "One-click launcher to deploy your ComfyUI Docker image on RunPod GPUs",
   "author": "Bishoy",
   "license": "MIT",
@@ -30,7 +30,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico"
@@ -39,6 +41,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ComfyUI RunPod Launcher"

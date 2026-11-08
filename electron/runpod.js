@@ -370,7 +370,7 @@ const MANIFEST_ACCEPT = [
   'application/vnd.oci.image.index.v1+json',
 ].join(',');
 
-// "bishoy22/comfyui-wan:latest" -> { repo: 'bishoy22/comfyui-wan', tag: 'latest' }
+// "bishoy22/comfyui-studio:latest" -> { repo: 'bishoy22/comfyui-studio', tag: 'latest' }
 function parseImageRef(image) {
   const ref = String(image || '').trim();
   if (!ref) throw new Error('No image name set');

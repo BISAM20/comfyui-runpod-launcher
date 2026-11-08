@@ -46,7 +46,8 @@ contextBridge.exposeInMainWorld('api', {
   hasApiKey: () => ok(true),
   validateAndSaveKey: () => ok(true),
   clearApiKey: () => ok(true),
-  getDeployDefaults: () => ok({ image: 'bishoy22/comfyui-wan:latest', containerDisk: 50, volumeDisk: 120, onClose: 'nothing', autoOpen: 'ready' }),
+  forgetKeys: () => ok({ apiKey: false, hfToken: false }),
+  getDeployDefaults: () => ok({ image: 'bishoy22/comfyui-studio:latest', containerDisk: 50, volumeDisk: 120, onClose: 'nothing', autoOpen: 'ready' }),
   saveDeployDefaults: () => ok(true),
   setOnClose: (a) => ok(a),
   setAutoOpen: (m) => ok(m),
@@ -58,7 +59,7 @@ contextBridge.exposeInMainWorld('api', {
   balance: () => ok({ balance: 42.18, spendPerHr: 0.44 }),
   modelManifest: () => ok({
     source: 'pod',
-    image: 'bishoy22/comfyui-wan:latest',
+    image: 'bishoy22/comfyui-studio:latest',
     models: [
       { env: 'DOWNLOAD_WAN22_T2V', name: 'Wan 2.2 — Text-to-Video', desc: 'High + low noise fp8 (14B)', gb: 28.6 },
       { env: 'DOWNLOAD_WAN22_I2V', name: 'Wan 2.2 — Image-to-Video', desc: 'High + low noise fp8 (14B)', gb: 28.6 },

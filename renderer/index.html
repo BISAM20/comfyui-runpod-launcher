@@ -190,8 +190,8 @@
           </header>
           <div class="field">
             <label>Docker image</label>
-            <input id="imageName" type="text" />
-            <span class="hint">The image this launcher deploys.</span>
+            <input id="imageName" type="text" readonly />
+            <span class="hint">ComfyUI Studio is the only image this launcher deploys.</span>
           </div>
           <div class="field">
             <label>RunPod API key</label>
@@ -203,7 +203,12 @@
                 disabled
               />
               <button id="changeKeyBtn" class="btn ghost">Change key</button>
+              <button id="forgetKeysBtn" class="btn ghost">Forget saved keys</button>
             </div>
+            <span class="hint">
+              Your keys are stored encrypted on this PC only. Uninstalling the app
+              removes them too.
+            </span>
           </div>
           <div class="field">
             <label>Model manifest URL <span class="muted">(optional)</span></label>
@@ -313,7 +318,6 @@
     <!-- Toast -->
     <div id="toast" class="toast hidden"></div>
 
-    <script src="models.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

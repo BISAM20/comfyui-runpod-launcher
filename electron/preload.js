@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   hasApiKey: () => invoke('settings:hasApiKey'),
   validateAndSaveKey: (key) => invoke('settings:validateAndSave', key),
   clearApiKey: () => invoke('settings:clearApiKey'),
+  forgetKeys: () => invoke('settings:forgetKeys'),
   getDeployDefaults: () => invoke('settings:getDeployDefaults'),
   saveDeployDefaults: (obj) => invoke('settings:saveDeployDefaults', obj),
   setOnClose: (action) => invoke('settings:setOnClose', action),

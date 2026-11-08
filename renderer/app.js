@@ -24,7 +24,6 @@ const state = {
   balanceTimer: null,
   hasHfToken: false,
   volumeManual: false, // true once the user edits the volume size themselves
-  catalogImage: null, // image the current model catalog was loaded for
 };
 
 // -----------------------------------------------------------------------------
@@ -65,8 +64,7 @@ function confirmModal(title, body, confirmLabel, onConfirm) {
 // -----------------------------------------------------------------------------
 async function boot() {
   wireEvents();
-  // Start empty — the catalog is resolved per image by loadModelCatalog(). We
-  // must not show flags before knowing which image they belong to.
+  // Start empty — the catalog is read from the image by loadModelCatalog().
   window.MODEL_CATALOG = [];
   renderModelList();
   window.api.onLog(appendLiveLog); // stream logs into the Logs panel
@@ -329,8 +327,7 @@ function renderGpus() {
 // -----------------------------------------------------------------------------
 // Model list
 // -----------------------------------------------------------------------------
-// Load the model catalog published by the Docker image, falling back to the
-// bundled list when no manifest is reachable.
+// Load the model catalog published by the ComfyUI Studio image.
 async function loadModelCatalog() {
   // Preserve the user's ticks across a re-render (boot replaces the fallback
   // list, and "Reload list" refetches it).
@@ -339,8 +336,7 @@ async function loadModelCatalog() {
   note.textContent = 'Reading model list from the image…';
   note.style.color = 'var(--muted)';
 
-  const image = $('#imageName').value.trim();
-  const res = await window.api.modelManifest(image);
+  const res = await window.api.modelManifest();
 
   if (res.ok && res.data && res.data.models.length) {
     window.MODEL_CATALOG = res.data.models;
@@ -350,27 +346,15 @@ async function loadModelCatalog() {
       (unknown ? ` — ${unknown} without a published size` : '');
     note.style.color = 'var(--green)';
   } else {
-    // The built-in list is only valid for the image it was written for. Showing
-    // it for a different image would offer DOWNLOAD_* flags that image ignores:
-    // the pod would deploy and download nothing, with no error anywhere.
-    const repo = image.split(':')[0];
-    if (!image || repo === window.MODEL_CATALOG_FALLBACK_IMAGE) {
-      window.MODEL_CATALOG = window.MODEL_CATALOG_FALLBACK;
-      note.textContent =
-        'Using the built-in list — could not read the model list from this image.';
-      note.style.color = 'var(--amber)';
-    } else {
-      window.MODEL_CATALOG = [];
-      note.innerHTML =
-        '⚠ Could not read the model list from <b>' +
-        escapeHtml(image) +
-        '</b>. Its models are not shown rather than guessed, because the wrong ' +
-        'flags would deploy a pod that downloads nothing. Check the image name, ' +
-        'or set a manifest URL in Settings, then use ↻ Reload list.';
-      note.style.color = 'var(--danger)';
-    }
+    // No built-in fallback list on purpose: a static copy drifts from the image,
+    // and a DOWNLOAD_* flag the image does not declare is silently ignored — the
+    // pod would deploy and download nothing, with no error anywhere.
+    window.MODEL_CATALOG = [];
+    note.innerHTML =
+      '⚠ Could not read the model list from the ComfyUI Studio image. Check your ' +
+      'internet connection and use ↻ Reload list. You can still deploy a bare ComfyUI.';
+    note.style.color = 'var(--danger)';
   }
-  state.catalogImage = image;
   renderModelList();
   // Restore ticks for models that still exist in the new list.
   for (const input of $$('#modelList input')) {
@@ -510,7 +494,6 @@ async function deploy() {
     containerDiskInGb: parseInt($('#containerDisk').value, 10) || 30,
     volumeInGb: parseInt($('#volumeDisk').value, 10) || 100,
     env,
-    imageName: $('#imageName').value.trim() || undefined,
   };
 
   const btn = $('#deployBtn');
@@ -527,7 +510,6 @@ async function deploy() {
   if (res.ok) {
     // Remember disk preferences for next time.
     window.api.saveDeployDefaults({
-      image: opts.imageName,
       containerDisk: opts.containerDiskInGb,
       volumeDisk: opts.volumeInGb,
     });
@@ -804,15 +786,6 @@ function wireEvents() {
   $('#refreshGpuBtn').addEventListener('click', loadGpus);
   $('#refreshModelsBtn').addEventListener('click', loadModelCatalog);
 
-  // Changing the image changes which models exist — reload the catalog once
-  // the user stops typing.
-  let imgTimer = null;
-  $('#imageName').addEventListener('input', () => {
-    clearTimeout(imgTimer);
-    imgTimer = setTimeout(() => {
-      if ($('#imageName').value.trim() !== state.catalogImage) loadModelCatalog();
-    }, 900);
-  });
   $('#refreshPodsBtn').addEventListener('click', loadPods);
   $('#deployBtn').addEventListener('click', deploy);
   // Typing a volume size switches to manual; clearing it returns to auto.
@@ -825,7 +798,6 @@ function wireEvents() {
   // Settings
   $('#saveSettingsBtn').addEventListener('click', async () => {
     await window.api.saveDeployDefaults({
-      image: $('#imageName').value.trim(),
       containerDisk: parseInt($('#containerDisk').value, 10) || 30,
       volumeDisk: parseInt($('#volumeDisk').value, 10) || 100,
       manifestUrl: $('#manifestUrl').value.trim(),
@@ -853,6 +825,30 @@ function wireEvents() {
   $('#changeKeyBtn').addEventListener('click', async () => {
     await window.api.clearApiKey();
     showScreen('#screen-setup');
+  });
+
+  // Forget EVERYTHING secret saved on this PC — the RunPod key and the
+  // HuggingFace token. ("Change key" above clears only the RunPod key.)
+  $('#forgetKeysBtn').addEventListener('click', () => {
+    confirmModal(
+      'Forget saved keys?',
+      'This removes your RunPod API key and your HuggingFace token from this PC. ' +
+        'Pods that are already running are not affected. You will need to enter a key ' +
+        'again to use the app.',
+      'Forget keys',
+      async () => {
+        await window.api.forgetKeys();
+        clearInterval(state.balanceTimer);
+        stopProgressPoll();
+        $('#costMeter').classList.add('hidden');
+        $('#settingsHfToken').value = '';
+        $('#apiKeyInput').value = '';
+        state.hasHfToken = false;
+        state.pods = [];
+        showScreen('#screen-setup');
+        toast('Saved keys removed from this PC', 'ok');
+      }
+    );
   });
 
   // Auto-open selector — save immediately on change.

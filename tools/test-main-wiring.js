@@ -13,6 +13,12 @@ const Module = require('module');
 
 // --- fake Electron ------------------------------------------------------------
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'launcher-wiring-'));
+// Settings as an OLDER version (<= 1.4.0) saved them: the editable image setting
+// pointing at the retired comfyui-wan image. Written before main.js loads.
+fs.writeFileSync(
+  path.join(userData, 'settings.json'),
+  JSON.stringify({ image: 'bishoy22/comfyui-wan:latest', onClose: 'stop' })
+);
 const handlers = new Map();
 const opened = [];
 const sent = [];
@@ -52,12 +58,17 @@ const json = (obj, status = 200) =>
 const text = (t, status = 200) =>
   Promise.resolve({ ok: status < 400, status, statusText: '', text: async () => t, json: async () => ({}) });
 
+const fetched = []; // every URL the app asked for
+let lastPodBody = null; // the last POST /pods body
+
 global.fetch = async (url, init = {}) => {
   url = String(url);
+  fetched.push(url);
   const method = (init.method || 'GET').toUpperCase();
   let m;
   if (url === 'https://rest.runpod.io/v1/pods' && method === 'POST') {
     const body = JSON.parse(init.body);
+    lastPodBody = body;
     const id = body.name; // tests choose the id via the pod name
     if (!pods[id]) pod(id);
     return json({ id, desiredStatus: 'RUNNING' }, 201);
@@ -200,6 +211,63 @@ async function test(name, fn) {
     assert.strictEqual(r.ok, true);
     await settleMs(100);
     assert.ok(!opened.includes(url('wiredel0001')));
+  });
+
+  await test('an image saved by an older version is dropped at startup, other settings kept', async () => {
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'));
+    assert.ok(!('image' in saved), 'the stale comfyui-wan image is still in settings.json');
+    assert.strictEqual(saved.onClose, 'stop', 'unrelated settings must survive the migration');
+  });
+
+  await test('the app only ever offers the Studio image, whatever is saved or asked for', async () => {
+    const STUDIO = 'bishoy22/comfyui-studio:latest';
+    assert.strictEqual((await call('settings:getDeployDefaults')).data.image, STUDIO);
+    await call('settings:saveDeployDefaults', { image: 'evil/other:latest', containerDisk: 40 });
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'));
+    assert.ok(!('image' in saved), 'saving must not be able to store an image');
+    assert.strictEqual(saved.containerDisk, 40, 'other values are still saved');
+    assert.strictEqual((await call('settings:getDeployDefaults')).data.image, STUDIO);
+  });
+
+  await test('createPod always deploys Studio, ignoring any image the UI sends', async () => {
+    pod('wireimage01', { comfy: [502] });
+    await call('runpod:createPod', { name: 'wireimage01', gpuTypeId: 'g', imageName: 'bishoy22/comfyui-wan:latest' });
+    assert.strictEqual(lastPodBody.imageName, 'bishoy22/comfyui-studio:latest');
+    await call('runpod:stopPod', 'wireimage01');
+  });
+
+  await test('the model catalog is only ever requested for the Studio image', async () => {
+    fetched.length = 0;
+    const r = await call('runpod:modelManifest', 'evil/other:latest'); // the argument must be ignored
+    assert.strictEqual(r.ok, false); // the fake network has no registry; what matters is WHICH repo was asked for
+    const asked = fetched.filter((u) => u.includes('repository:'));
+    assert.ok(asked.length > 0, 'it did not even try to read the image');
+    assert.ok(asked.every((u) => u.includes('repository:bishoy22/comfyui-studio:')), 'asked for: ' + asked.join(', '));
+  });
+
+  await test('"Forget saved keys" removes BOTH the RunPod key and the HuggingFace token', async () => {
+    await call('settings:saveHfToken', 'hf_fake_token_for_test_only');
+    assert.ok(fs.existsSync(path.join(userData, 'apikey.bin')), 'precondition: key saved');
+    assert.ok(fs.existsSync(path.join(userData, 'hftoken.bin')), 'precondition: token saved');
+
+    // secrets must never be written anywhere readable, in particular not settings.json
+    const settingsText = fs.readFileSync(path.join(userData, 'settings.json'), 'utf8');
+    assert.ok(!settingsText.includes('rpa_') && !settingsText.includes('hf_'), 'a secret leaked into settings.json');
+
+    // a pod being watched must not be opened once the account is forgotten
+    pod('wireforget01', { comfy: [502, 502, 502] });
+    await call('runpod:createPod', { name: 'wireforget01', gpuTypeId: 'g' });
+
+    const r = await call('settings:forgetKeys');
+    assert.deepStrictEqual(r.data, { apiKey: false, hfToken: false });
+    assert.ok(!fs.existsSync(path.join(userData, 'apikey.bin')), 'apikey.bin still on disk');
+    assert.ok(!fs.existsSync(path.join(userData, 'hftoken.bin')), 'hftoken.bin still on disk');
+    assert.strictEqual((await call('settings:hasApiKey')).data, false);
+    assert.strictEqual((await call('settings:hasHfToken')).data, false);
+
+    pods.wireforget01.comfy = [200]; // it would open now if it were still being watched
+    await settleMs(150);
+    assert.ok(!opened.includes(url('wireforget01')), 'the watcher kept running after keys were forgotten');
   });
 
   console.log(out.join('\n'));

@@ -982,3 +982,9 @@ select:focus {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Read-only values (e.g. the fixed Docker image) */
+input[readonly] {
+  color: var(--muted);
+  cursor: default;
+}
