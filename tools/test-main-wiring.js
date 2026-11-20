@@ -59,28 +59,88 @@ const text = (t, status = 200) =>
   Promise.resolve({ ok: status < 400, status, statusText: '', text: async () => t, json: async () => ({}) });
 
 const fetched = []; // every URL the app asked for
+const restCalls = []; // every RunPod REST call: { method, path, body }
 let lastPodBody = null; // the last POST /pods body
+let restDown = false; // simulate a dead RunPod host (DNS failure)
+
+// RunPod API v2 (https://api.runpod.io/v2) — modelled on its published OpenAPI
+// spec. Like the real server it REJECTS unknown request fields with 422.
+const V2_CREATE_FIELDS = new Set([
+  'name', 'image', 'cloud', 'gpu', 'cpu', 'disk', 'mounts', 'ports', 'env', 'args', 'cmd',
+  'entrypoint', 'registry', 'dataCenterIds', 'globalNetworking', 'startJupyter', 'startSsh',
+  'templateId', 'queue',
+]);
+const V2_GPU_FIELDS = new Set(['id', 'count', 'allowedCudaVersions', 'minCudaVersion', 'minRamPerGpu', 'minVcpuCountPerGpu']);
+const err422 = (...errors) => json({ title: 'Unprocessable Entity', status: 422, detail: 'invalid request', errors }, 422);
+const v2Pod = (id, p) => ({
+  id, name: id, image: 'bishoy22/comfyui-studio:latest', args: '', disk: 50, ports: ['8188/http'], env: {},
+  registry: null, status: p.status, actions: [], mounts: { persistent: { size: 100, path: '/workspace' } },
+  gpu: { id: 'NVIDIA RTX PRO 6000 Blackwell Server Edition', count: 1, vcpuCount: 16, memory: 64 },
+  cloud: 'SECURE', dataCenterId: 'EU-RO-1', cudaVersion: '12.8', ssh: null, template: null, cost: 1.89,
+  locked: false, globalNetworking: { enabled: false }, runtime: null,
+  createdAt: '2026-11-20T10:00:00Z', startedAt: '2026-11-20T10:02:00Z',
+});
 
 global.fetch = async (url, init = {}) => {
   url = String(url);
   fetched.push(url);
   const method = (init.method || 'GET').toUpperCase();
   let m;
-  if (url === 'https://rest.runpod.io/v1/pods' && method === 'POST') {
-    const body = JSON.parse(init.body);
-    lastPodBody = body;
-    const id = body.name; // tests choose the id via the pod name
-    if (!pods[id]) pod(id);
-    return json({ id, desiredStatus: 'RUNNING' }, 201);
+  if (url.startsWith('https://rest.runpod.io/')) {
+    // the retired v1 host — it no longer resolves, exactly like in production
+    const e = new TypeError('fetch failed');
+    e.cause = Object.assign(new Error('getaddrinfo ENOTFOUND rest.runpod.io'), { code: 'ENOTFOUND' });
+    throw e;
   }
-  if (url === 'https://rest.runpod.io/v1/pods' && method === 'GET') return json([]);
-  if ((m = url.match(/^https:\/\/rest\.runpod\.io\/v1\/pods\/([a-z0-9]+)(\/start|\/stop)?$/))) {
-    const p = pods[m[1]];
-    if (!p) return json({ error: 'pod not found' }, 404);
-    if (m[2] === '/start') { p.status = 'RUNNING'; return json({}, 200); }
-    if (m[2] === '/stop') { p.status = 'EXITED'; return json({}, 200); }
-    if (method === 'DELETE') { delete pods[m[1]]; return json({}, 200); }
-    return json({ id: m[1], desiredStatus: p.status });
+  if (url.startsWith('https://api.runpod.io/v2/')) {
+    if (restDown) {
+      const e = new TypeError('fetch failed');
+      e.cause = Object.assign(new Error('getaddrinfo ENOTFOUND api.runpod.io'), { code: 'ENOTFOUND' });
+      throw e;
+    }
+    const rpath = url.slice('https://api.runpod.io/v2'.length);
+    const body = init.body ? JSON.parse(init.body) : undefined;
+    restCalls.push({ method, path: rpath, body });
+    if (!/^Bearer \S+$/.test((init.headers || {}).Authorization || '')) {
+      return json({ title: 'Unauthorized', status: 401, detail: 'missing or invalid API key' }, 401);
+    }
+    if (rpath === '/pods' && method === 'POST') {
+      lastPodBody = body;
+      const bad = Object.keys(body).filter((k) => !V2_CREATE_FIELDS.has(k)).map((k) => `$: additional properties '${k}' not allowed`);
+      if (typeof body.name !== 'string' || !body.name) bad.push('$.name: required');
+      if (!body.image) bad.push('$.image: required unless templateId is set');
+      if (!body.gpu && !body.cpu) bad.push('$: supply exactly one of gpu or cpu');
+      if (body.gpu) {
+        if (!body.gpu.id) bad.push('$.gpu.id: required');
+        for (const k of Object.keys(body.gpu)) if (!V2_GPU_FIELDS.has(k)) bad.push(`$.gpu: additional properties '${k}' not allowed`);
+      }
+      if (body.cloud && !['SECURE', 'COMMUNITY'].includes(body.cloud)) bad.push('$.cloud: must be SECURE or COMMUNITY');
+      if (body.mounts && body.mounts.persistent && !(body.mounts.persistent.size >= 10)) bad.push('$.mounts.persistent.size: minimum 10');
+      if (bad.length) return err422(...bad);
+      const id = body.name; // tests choose the id via the pod name
+      if (!pods[id]) pod(id);
+      return json(v2Pod(id, { status: 'PROVISIONING' }), 201);
+    }
+    if (rpath.startsWith('/pods?') && method === 'GET') {
+      const q = new URLSearchParams(rpath.split('?')[1]);
+      const all = Object.keys(pods).map((id) => v2Pod(id, pods[id]));
+      const start = Number(q.get('cursor') || 0), limit = Math.min(Number(q.get('limit') || 100), 2); // tiny pages
+      const slice = all.slice(start, start + limit);
+      const next = start + limit < all.length ? String(start + limit) : null;
+      return json({ pods: slice, pagination: { nextCursor: next, hasNextPage: !!next } });
+    }
+    if ((m = rpath.match(/^\/pods\/([A-Za-z0-9]+)(\/action)?$/))) {
+      const p = pods[m[1]];
+      if (!p) return json({ title: 'Not Found', status: 404, detail: 'pod not found' }, 404);
+      if (m[2] === '/action' && method === 'POST') {
+        if (body.action === 'start') { p.status = 'RUNNING'; return json(v2Pod(m[1], p)); }
+        if (body.action === 'stop') { p.status = 'EXITED'; return json(v2Pod(m[1], p)); }
+        if (body.action === 'terminate') { delete pods[m[1]]; return Promise.resolve({ ok: true, status: 204, statusText: '', text: async () => '' }); }
+        return err422('$.action: must be one of start, stop, restart, terminate');
+      }
+      if (!m[2] && method === 'GET') return json(v2Pod(m[1], p));
+    }
+    throw new Error('unexpected v2 call: ' + method + ' ' + rpath);
   }
   if ((m = url.match(/^https:\/\/([a-z0-9]+)-8188\.proxy\.runpod\.net\/$/))) {
     const p = pods[m[1]];
@@ -131,7 +191,7 @@ async function test(name, fn) {
 }
 
 (async () => {
-  // sign in (validateKey does GET /pods)
+  // sign in (validateKey does GET /pods?limit=1 on the v2 API)
   const key = await call('settings:validateAndSave', 'rpa_fake_key_for_test');
   assert.strictEqual(key.ok, true, 'could not save the fake key');
 
@@ -232,8 +292,109 @@ async function test(name, fn) {
   await test('createPod always deploys Studio, ignoring any image the UI sends', async () => {
     pod('wireimage01', { comfy: [502] });
     await call('runpod:createPod', { name: 'wireimage01', gpuTypeId: 'g', imageName: 'bishoy22/comfyui-wan:latest' });
-    assert.strictEqual(lastPodBody.imageName, 'bishoy22/comfyui-studio:latest');
+    assert.strictEqual(lastPodBody.image, 'bishoy22/comfyui-studio:latest');
     await call('runpod:stopPod', 'wireimage01');
+  });
+
+  // ---- RunPod API v2 contract (the old rest.runpod.io/v1 host is gone) --------
+  await test('every REST call goes to api.runpod.io/v2 — never the retired rest.runpod.io', async () => {
+    assert.ok(restCalls.length > 0);
+    assert.ok(!fetched.some((u) => u.startsWith('https://rest.runpod.io/')), 'something still talks to rest.runpod.io');
+  });
+
+  await test('createPod sends exactly the v2 schema (the fake server rejects anything else with 422)', async () => {
+    pod('wirev2body1', { comfy: [502] });
+    const r = await call('runpod:createPod', {
+      name: 'wirev2body1', gpuTypeId: 'NVIDIA RTX PRO 6000 Blackwell Server Edition', cloudType: 'COMMUNITY',
+      containerDiskInGb: 40, volumeInGb: 180, env: { DOWNLOAD_LTX23_DEV_FP8: 'true' },
+    });
+    assert.strictEqual(r.ok, true, r.error);
+    const b = lastPodBody;
+    assert.strictEqual(b.image, 'bishoy22/comfyui-studio:latest');
+    assert.strictEqual(b.cloud, 'COMMUNITY');
+    assert.deepStrictEqual(b.gpu, { id: 'NVIDIA RTX PRO 6000 Blackwell Server Edition', count: 1 });
+    assert.strictEqual(b.disk, 40);
+    assert.deepStrictEqual(b.mounts, { persistent: { size: 180, path: '/workspace' } });
+    assert.ok(b.ports.includes('8188/http') && b.ports.includes('8189/http'));
+    assert.strictEqual(b.env.DOWNLOAD_LTX23_DEV_FP8, 'true');
+    for (const old of ['imageName', 'computeType', 'cloudType', 'gpuTypeIds', 'gpuCount', 'containerDiskInGb',
+      'volumeInGb', 'volumeMountPath', 'dataCenterPriority', 'gpuTypePriority', 'interruptible']) {
+      assert.ok(!(old in b), 'legacy v1 field still sent: ' + old);
+    }
+    await call('runpod:stopPod', 'wirev2body1');
+  });
+
+  await test('pods come back with the field names the UI reads (status, cost, GPU name, URLs)', async () => {
+    pod('wirenorm001', { status: 'RUNNING', comfy: [502] });
+    const r = await call('runpod:getPod', 'wirenorm001');
+    assert.strictEqual(r.ok, true, r.error);
+    assert.strictEqual(r.data.desiredStatus, 'RUNNING');
+    assert.strictEqual(r.data.costPerHr, 1.89);
+    assert.strictEqual(r.data.gpu.displayName, 'RTX PRO 6000 Blackwell Server Edition');
+    assert.strictEqual(r.data.volumeInGb, 100);
+    assert.strictEqual(r.data.comfyUrl, 'https://wirenorm001-8188.proxy.runpod.net');
+    assert.strictEqual(r.data.image, 'bishoy22/comfyui-studio:latest');
+    const created = await call('runpod:createPod', { name: 'wirenorm002', gpuTypeId: 'g' });
+    assert.strictEqual(created.data.desiredStatus, 'PROVISIONING', 'a freshly created pod must carry a status');
+    await call('runpod:stopPod', 'wirenorm002');
+    await call('runpod:stopPod', 'wirenorm001');
+  });
+
+  await test('start / stop / terminate use POST /pods/{id}/action with the right verb', async () => {
+    pod('wireact0001', { comfy: [502] });
+    restCalls.length = 0;
+    await call('runpod:stopPod', 'wireact0001');
+    await call('runpod:startPod', 'wireact0001');
+    const del = await call('runpod:deletePod', 'wireact0001');
+    assert.strictEqual(del.ok, true, 'terminate answers 204 with no body and must not be an error');
+    const acts = restCalls.filter((c) => c.path === '/pods/wireact0001/action');
+    assert.deepStrictEqual(acts.map((c) => [c.method, c.body.action]), [['POST', 'stop'], ['POST', 'start'], ['POST', 'terminate']]);
+    assert.ok(!restCalls.some((c) => /\/(stop|start)$/.test(c.path) || c.method === 'DELETE'), 'a v1-style call slipped through');
+    assert.ok(!pods.wireact0001, 'the pod should be gone after terminate');
+  });
+
+  await test('listing pods follows every page, so the kill switch cannot miss one', async () => {
+    for (let i = 1; i <= 5; i++) pod('wirepage000' + i, { comfy: [502] });
+    const r = await call('runpod:listPods');
+    assert.strictEqual(r.ok, true, r.error);
+    const ids = r.data.map((p) => p.id);
+    for (let i = 1; i <= 5; i++) assert.ok(ids.includes('wirepage000' + i), 'missing pod ' + i);
+    for (let i = 1; i <= 5; i++) delete pods['wirepage000' + i];
+  });
+
+  await test('API errors show RunPod\'s own explanation, including field-level details', async () => {
+    const r = await call('runpod:createPod', { name: 'wireerr00001', gpuTypeId: '' });
+    assert.strictEqual(r.ok, false);
+    assert.ok(/invalid request/.test(r.error) && /gpu\.id/.test(r.error), 'got: ' + r.error);
+    const missing = await call('runpod:getPod', 'nosuchpod01');
+    assert.strictEqual(missing.ok, false);
+    assert.ok(/pod not found/.test(missing.error), 'got: ' + missing.error);
+  });
+
+  await test('the Logs tab gets its entries in the { ok, data } envelope, with secrets redacted', async () => {
+    await call('settings:saveHfToken', 'hf_logleaktest123');
+    pod('wirelog0001', { comfy: [502] });
+    await call('runpod:createPod', { name: 'wirelog0001', gpuTypeId: 'g' });
+    const r = await call('logs:get');
+    assert.strictEqual(r.ok, true);
+    assert.ok(Array.isArray(r.data) && r.data.length > 0, 'logs came back empty');
+    assert.ok(r.data.some((e) => e.level && e.msg && /REST POST \/pods/.test(e.msg)), 'the create request is not in the log');
+    const all = JSON.stringify(r.data);
+    assert.ok(!all.includes('hf_logleaktest123') && !all.includes('rpa_fake_key_for_test'), 'a secret is visible in the log');
+    await call('runpod:stopPod', 'wirelog0001');
+    assert.strictEqual((await call('logs:clear')).ok, true);
+    assert.strictEqual((await call('logs:get')).data.length, 0, 'clear did not empty the buffer');
+  });
+
+  await test('a network failure reports the real cause instead of just "fetch failed"', async () => {
+    restDown = true;
+    try {
+      const r = await call('runpod:listPods');
+      assert.strictEqual(r.ok, false);
+      assert.ok(/ENOTFOUND/.test(r.error), 'the DNS error code is missing: ' + r.error);
+    } finally {
+      restDown = false;
+    }
   });
 
   await test('the model catalog is only ever requested for the Studio image', async () => {

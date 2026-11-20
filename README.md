@@ -5,7 +5,7 @@ click — pick a GPU with live pricing and availability, choose which AI models 
 pre-download, launch, then open ComfyUI, watch progress, and stop or terminate
 the pod. All from one window.
 
-![Version](https://img.shields.io/badge/version-1.4.1-6d5efc)
+![Version](https://img.shields.io/badge/version-1.4.2-6d5efc)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0a7bbb)
 ![License](https://img.shields.io/badge/license-MIT-2ecc8f)
 [![Download the installer](https://img.shields.io/badge/⬇%20Download-Installer-brightgreen)](https://github.com/BISAM20/comfyui-runpod-launcher/releases/latest)
@@ -32,6 +32,7 @@ Newest first. Installers for every version are on the
 
 | Version | Date | What changed |
 |---|---|---|
+| [v1.4.2](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.2) | 2026-11-20 | **Fixes "Network error … fetch failed" — pods can be deployed again**; Logs tab fixed |
 | [v1.4.1](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.1) | 2026-11-08 | Saved keys no longer outlive the app; ComfyUI Studio is the only image |
 | [v1.4.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.0) | 2026-11-06 | ComfyUI opens by itself |
 | [v1.3.2](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.3.2) | 2026-07-28 | Bigger default volume |
@@ -42,9 +43,36 @@ Newest first. Installers for every version are on the
 | [v1.1.0](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.1.0) | 2026-07-23 | Availability, progress, and a kill switch |
 | v1.0.0 | 2026-07-23 | First build (never published; v1.1.0 was the first download) |
 
-### v1.4.1 — Saved keys no longer outlive the app
+### v1.4.2 — Pods can be deployed again
 
-*Released 2026-11-08 · [release page and installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.1)*
+*Released 2026-11-20 · [release page and installer](https://github.com/BISAM20/comfyui-runpod-launcher/releases/tag/v1.4.2)*
+
+**Fixed**
+- **Deploying failed with "Network error reaching RunPod: fetch failed".** RunPod
+  switched off the server older versions used to create and manage pods
+  (`rest.runpod.io`) and moved to a new API at `api.runpod.io/v2`. GPU prices and your
+  balance still loaded, because they come from a different service, but nothing that
+  creates, lists, stops, starts or terminates a pod could connect. The app now uses the
+  new API for all of it, including signing in with a new key.
+- **The kill switch works again.** It uses the same calls, so on older versions it could
+  not stop or terminate pods when you closed the app. It now also reads *every* page of
+  your pod list, so no pod is missed.
+- **The Logs tab was always empty** in the installed app. It now shows the app's request
+  log, and *Copy* copies it. Keys and tokens are still hidden in it.
+- Network errors now say *why* (for example `ENOTFOUND` for a DNS failure) instead of
+  only "fetch failed".
+
+**Update needed:** v1.4.1 and earlier cannot deploy until updated — RunPod removed what
+they rely on. Install over the old version; your settings are kept.
+
+**If you used an older version recently**, open the [RunPod console](https://www.runpod.io/console/pods)
+and check no pod is still running: those versions could not stop pods when you closed
+the app.
+
+### Earlier releases
+
+<details>
+<summary><b>v1.4.1</b> — Saved keys no longer outlive the app <i>(2026-11-08)</i></summary>
 
 **Fixed**
 - **Saved keys survived an uninstall.** The app keeps your RunPod API key and
@@ -72,7 +100,7 @@ Newest first. Installers for every version are on the
 RunPod console (Settings → API Keys) and create a new one. Removing the app from their PC
 does not remove the key from your account.
 
-### Earlier releases
+</details>
 
 <details>
 <summary><b>v1.4.0</b> — ComfyUI opens by itself <i>(2026-11-06)</i></summary>
@@ -1036,7 +1064,7 @@ Maintainer setup: [docs/code-signing.md](docs/code-signing.md).
 your RunPod API key and optional HuggingFace token encrypted on your own PC
 (Windows data protection) and uses them only as follows:
 
-- **RunPod** (`rest.runpod.io`, `api.runpod.io`) — to list GPUs, deploy and manage
+- **RunPod** (`api.runpod.io`) — to list GPUs, deploy and manage
   your pods, and read your balance. Your API key is sent here.
 - **Your own pods** (`*.proxy.runpod.net`) — to check that ComfyUI is up and to
   read the pod's progress logs. No credentials are sent.

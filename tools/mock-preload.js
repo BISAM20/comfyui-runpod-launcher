@@ -38,7 +38,7 @@ const LOGS = [
   { t: now - 7000, level: 'req', msg: 'REST GET /pods' },
   { t: now - 6800, level: 'ok', msg: 'REST GET /pods → 200' },
   { t: now - 4000, level: 'info', msg: 'Creating pod "comfyui-pod" — g2 ×1, SECURE, disk 50GB, vol 120GB' },
-  { t: now - 3800, level: 'req', msg: 'REST POST /pods', detail: '{"body":{"name":"comfyui-pod","gpuTypeIds":["g2"],"containerDiskInGb":50,"volumeInGb":120}}' },
+  { t: now - 3800, level: 'req', msg: 'REST POST /pods', detail: '{"body":{"name":"comfyui-pod","image":"bishoy22/comfyui-studio:latest","gpu":{"id":"NVIDIA A40","count":1},"disk":50,"mounts":{"persistent":{"size":120,"path":"/workspace"}}}}' },
   { t: now - 3500, level: 'ok', msg: 'REST POST /pods → 201' },
 ];
 

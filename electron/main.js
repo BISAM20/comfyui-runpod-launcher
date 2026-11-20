@@ -154,8 +154,10 @@ function handle(channel, fn) {
 }
 
 // Logs panel channels
-ipcMain.handle('logs:get', () => log.buffer);
-ipcMain.handle('logs:clear', () => {
+// The renderer unwraps every reply as { ok, data } (see preload/app.js), so these
+// must use the same envelope — a bare array made the Logs tab always look empty.
+handle('logs:get', async () => log.buffer.slice());
+handle('logs:clear', async () => {
   log.buffer.length = 0;
   return true;
 });

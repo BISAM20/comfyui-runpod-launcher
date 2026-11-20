@@ -2,21 +2,52 @@
 // RunPod API client — runs in the Electron MAIN process (no CORS restrictions).
 //
 // Two APIs are used:
-//   * REST    (https://rest.runpod.io/v1)   — create / list / stop / delete pods
+//   * REST    (https://api.runpod.io/v2)      — create / list / stop / delete pods
 //   * GraphQL (https://api.runpod.io/graphql) — live GPU types + pricing
+//
+// RunPod retired the old REST host (rest.runpod.io/v1, which no longer resolves
+// in DNS) in favour of the v2 API. v2 renamed most pod fields, so every pod that
+// comes back is run through normalizePod(), which also fills in the legacy field
+// names (desiredStatus, costPerHr, gpu.displayName …) the rest of the app reads.
 //
 // The API key is passed per-call so the caller controls where it is stored.
 // =============================================================================
 
 const log = require('./logger');
 
-const REST_BASE = 'https://rest.runpod.io/v1';
+const REST_BASE = 'https://api.runpod.io/v2';
 const GRAPHQL_URL = 'https://api.runpod.io/graphql';
 
 // Container ports exposed by the Docker image (see the image's README).
 const COMFYUI_PORT = 8188;
 const JUPYTER_PORT = 8888;
 const LOG_PORT = 8189; // read-only log server added in start.sh
+
+// -----------------------------------------------------------------------------
+// Network errors. Node's fetch only says "fetch failed"; the real reason
+// (DNS failure, refused, timeout …) is in err.cause, so surface it.
+// -----------------------------------------------------------------------------
+function describeNetworkError(err) {
+  const cause = err && err.cause;
+  const code = cause && (cause.code || cause.name);
+  const detail = cause && cause.message && cause.message !== err.message ? cause.message : '';
+  const base = (err && err.message) || String(err);
+  return [base, code && `(${code})`, detail && `— ${detail}`].filter(Boolean).join(' ');
+}
+
+// RunPod v2 errors look like { title, status, detail, errors: [...] }; v1 and
+// the GraphQL gateway used { error } / { message }.
+function describeApiError(data, res) {
+  if (data && typeof data === 'object') {
+    const main = data.detail || data.error || data.message || data.title;
+    const extra = Array.isArray(data.errors) && data.errors.length ? data.errors.join('; ') : '';
+    if (main || extra) {
+      const text = typeof main === 'string' ? main : main ? JSON.stringify(main) : '';
+      return [text, extra && `(${extra})`].filter(Boolean).join(' ');
+    }
+  }
+  return `RunPod API error ${res.status} ${res.statusText}`;
+}
 
 // -----------------------------------------------------------------------------
 // Low-level REST helper
@@ -34,8 +65,9 @@ async function restRequest(apiKey, method, path, body) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch (netErr) {
-    log.error(`Network error on ${method} ${path}`, { error: String(netErr) });
-    throw new Error(`Network error reaching RunPod: ${netErr.message || netErr}`);
+    const why = describeNetworkError(netErr);
+    log.error(`Network error on ${method} ${path}`, { error: why });
+    throw new Error(`Network error reaching RunPod: ${why}`);
   }
 
   const text = await res.text();
@@ -49,14 +81,12 @@ async function restRequest(apiKey, method, path, body) {
   }
 
   if (!res.ok) {
-    const msg =
-      (data && (data.error || data.message)) ||
-      `RunPod API error ${res.status} ${res.statusText}`;
+    const msg = describeApiError(data, res);
     log.error(`REST ${method} ${path} → ${res.status}`, {
       status: res.status,
       response: data,
     });
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    throw new Error(msg);
   }
   log.ok(`REST ${method} ${path} → ${res.status}`);
   return data;
@@ -75,8 +105,9 @@ async function graphqlRequest(apiKey, query, variables) {
       body: JSON.stringify({ query, variables }),
     });
   } catch (netErr) {
-    log.error('Network error on GraphQL', { error: String(netErr) });
-    throw new Error(`Network error reaching RunPod: ${netErr.message || netErr}`);
+    const why = describeNetworkError(netErr);
+    log.error('Network error on GraphQL', { error: why });
+    throw new Error(`Network error reaching RunPod: ${why}`);
   }
 
   const data = await res.json().catch(() => null);
@@ -108,8 +139,8 @@ async function getBalance(apiKey) {
 // Validate an API key by making a cheap authenticated call.
 // -----------------------------------------------------------------------------
 async function validateKey(apiKey) {
-  // Listing pods is cheap and requires a valid key.
-  await restRequest(apiKey, 'GET', '/pods');
+  // Listing one pod is cheap and requires a valid key.
+  await restRequest(apiKey, 'GET', '/pods?limit=1');
   return true;
 }
 
@@ -220,21 +251,17 @@ function normalizeStock(status, rented, total) {
 // }
 // -----------------------------------------------------------------------------
 async function createPod(apiKey, opts) {
+  // RunPod v2 rejects unknown properties (422), so only documented fields go out.
+  // `dataCenterIds` is left out on purpose: with it unset the scheduler picks a
+  // data center that currently has capacity for this GPU (avoids the
+  // "This machine does not have the resources" error from pinning a full one).
   const body = {
     name: opts.name || 'comfyui-pod',
-    imageName: opts.imageName,
-    computeType: 'GPU',
-    cloudType: opts.cloudType || 'SECURE',
-    gpuTypeIds: [opts.gpuTypeId],
-    gpuCount: opts.gpuCount || 1,
-    // Let RunPod choose a data center / machine that currently has capacity,
-    // instead of pinning one that may be full (avoids the
-    // "This machine does not have the resources" error).
-    dataCenterPriority: 'availability',
-    gpuTypePriority: 'availability',
-    containerDiskInGb: opts.containerDiskInGb || 30,
-    volumeInGb: opts.volumeInGb || 100,
-    volumeMountPath: '/workspace',
+    image: opts.imageName,
+    cloud: opts.cloudType === 'COMMUNITY' ? 'COMMUNITY' : 'SECURE',
+    gpu: { id: opts.gpuTypeId, count: opts.gpuCount || 1 },
+    disk: opts.containerDiskInGb || 30,
+    mounts: { persistent: { size: opts.volumeInGb || 100, path: '/workspace' } },
     ports: [
       `${COMFYUI_PORT}/http`,
       `${JUPYTER_PORT}/http`,
@@ -242,49 +269,80 @@ async function createPod(apiKey, opts) {
       '22/tcp',
     ],
     env: opts.env || {},
-    interruptible: !!opts.interruptible,
   };
   log.info(
-    `Creating pod "${body.name}" — ${opts.gpuTypeId} ×${body.gpuCount}, ` +
-      `${body.cloudType}, disk ${body.containerDiskInGb}GB, vol ${body.volumeInGb}GB`
+    `Creating pod "${body.name}" — ${opts.gpuTypeId} ×${body.gpu.count}, ` +
+      `${body.cloud}, disk ${body.disk}GB, vol ${body.mounts.persistent.size}GB`
   );
-  return restRequest(apiKey, 'POST', '/pods', body);
+  return normalizePod(await restRequest(apiKey, 'POST', '/pods', body));
 }
 
 // -----------------------------------------------------------------------------
 // List / get / lifecycle
 // -----------------------------------------------------------------------------
 async function listPods(apiKey) {
-  const data = await restRequest(apiKey, 'GET', '/pods');
-  // The REST API returns either an array or { pods: [...] } depending on version.
-  const pods = Array.isArray(data) ? data : data.pods || [];
-  return pods.map(decoratePod);
+  // Results are cursor-paginated: keep following nextCursor so no pod is missed
+  // (a missed pod could escape the kill switch and keep billing).
+  const pods = [];
+  let cursor = null;
+  for (let page = 0; page < 20; page++) {
+    const q = `?limit=1000${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+    const data = await restRequest(apiKey, 'GET', `/pods${q}`);
+    pods.push(...(Array.isArray(data) ? data : (data && data.pods) || []));
+    const pg = data && data.pagination;
+    if (!pg || !pg.hasNextPage || !pg.nextCursor) break;
+    cursor = pg.nextCursor;
+  }
+  return pods.map(normalizePod);
 }
 
 async function getPod(apiKey, podId) {
-  const data = await restRequest(apiKey, 'GET', `/pods/${podId}`);
-  return decoratePod(data);
+  const data = await restRequest(apiKey, 'GET', `/pods/${encodeURIComponent(podId)}`);
+  return normalizePod(data);
+}
+
+// v2 has a single state-transition endpoint: POST /pods/{id}/action
+// with { action: 'start' | 'stop' | 'restart' | 'terminate' }.
+async function podAction(apiKey, podId, action) {
+  return restRequest(apiKey, 'POST', `/pods/${encodeURIComponent(podId)}/action`, { action });
 }
 
 async function stopPod(apiKey, podId) {
-  return restRequest(apiKey, 'POST', `/pods/${podId}/stop`);
+  return podAction(apiKey, podId, 'stop');
 }
 
 async function startPod(apiKey, podId) {
-  return restRequest(apiKey, 'POST', `/pods/${podId}/start`);
+  return podAction(apiKey, podId, 'start');
 }
 
 async function deletePod(apiKey, podId) {
-  return restRequest(apiKey, 'DELETE', `/pods/${podId}`);
+  return podAction(apiKey, podId, 'terminate');
 }
 
 // -----------------------------------------------------------------------------
-// Add convenient derived fields to a pod object (service URLs).
+// Turn a v2 pod into the shape the UI and main process were written against:
+// keeps every v2 field, adds the legacy names, and adds the service URLs.
 // -----------------------------------------------------------------------------
-function decoratePod(pod) {
+function normalizePod(pod) {
   if (!pod || !pod.id) return pod;
+  const gpu = pod.gpu
+    ? { ...pod.gpu, displayName: pod.gpu.displayName || String(pod.gpu.id || '').replace(/^NVIDIA\s+/i, '') }
+    : pod.gpu;
   return {
     ...pod,
+    gpu,
+    // v2 statuses: PROVISIONING, STARTING, RUNNING, EXITED, ERROR, TERMINATED.
+    desiredStatus: pod.desiredStatus || pod.status,
+    costPerHr: pod.costPerHr != null ? pod.costPerHr : pod.cost,
+    imageName: pod.imageName || pod.image,
+    containerDiskInGb: pod.containerDiskInGb != null ? pod.containerDiskInGb : pod.disk,
+    volumeInGb:
+      pod.volumeInGb != null
+        ? pod.volumeInGb
+        : pod.mounts && pod.mounts.persistent
+          ? pod.mounts.persistent.size
+          : undefined,
+    lastStatusChange: pod.lastStatusChange || pod.startedAt || pod.createdAt,
     comfyUrl: `https://${pod.id}-${COMFYUI_PORT}.proxy.runpod.net`,
     jupyterUrl: `https://${pod.id}-${JUPYTER_PORT}.proxy.runpod.net`,
     logUrl: `https://${pod.id}-${LOG_PORT}.proxy.runpod.net`,
@@ -535,6 +593,7 @@ module.exports = {
   stopPod,
   startPod,
   deletePod,
+  normalizePod,
   probeComfy,
   fetchPodLogs,
   fetchModelManifest,
